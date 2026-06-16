@@ -23,9 +23,15 @@ h1{font-size:18px;font-weight:500;margin-bottom:4px}
 .card{background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px 20px;margin-bottom:12px}
 .row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #eee}
 .row:last-child{border-bottom:none;padding-bottom:0}
+.edit-row{background:#f8f8f8;border-radius:8px;padding:12px;margin:4px 0;border:1px solid #e0e0e0}
+.edit-row-grid{display:grid;grid-template-columns:80px 1fr 1fr 80px;gap:8px;margin-bottom:8px}
+.edit-row-grid input,.edit-row-grid select{font-size:13px;padding:6px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;outline:none;width:100%}
+.edit-btns{display:flex;gap:8px;justify-content:flex-end}
+.edit-btns button{padding:6px 14px;font-size:13px;border:1px solid #ccc;border-radius:8px;cursor:pointer}
+.btn-save{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btn-cancel{background:#f0f0f0;color:#1a1a1a}
 .rl{flex:1;font-size:14px}
 .rs{font-size:12px;color:#888;margin-top:3px}
-.rc{font-size:11px;color:#aaa;margin-top:2px}
 .bdg{font-size:11px;padding:3px 8px;border-radius:6px;display:inline-block}
 .bdg.news{background:#e8f4fd;color:#1a6fa8}
 .bdg.youtube{background:#fdecea;color:#b71c1c}
@@ -39,7 +45,6 @@ h1{font-size:18px;font-weight:500;margin-bottom:4px}
 .form-grid{display:grid;grid-template-columns:80px 1fr 1fr 80px auto;gap:8px;margin-top:12px;align-items:center}
 .form-grid input,.form-grid select{font-size:13px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;outline:none;width:100%}
 .form-grid button{padding:7px 14px;font-size:13px;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer;white-space:nowrap}
-.form-grid button:hover{background:#e0e0e0}
 .hint{font-size:11px;color:#aaa;margin-top:6px}
 .add-row{display:flex;gap:8px;margin-top:12px}
 .add-row input{flex:1;font-size:13px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;outline:none}
@@ -53,16 +58,15 @@ h1{font-size:18px;font-weight:500;margin-bottom:4px}
 .chip{padding:5px 12px;font-size:12px;border:1px solid #ccc;border-radius:20px;cursor:pointer;color:#666;background:#fff}
 .chip.on{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
 .pause-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid #eee;margin-top:8px}
-.bi{padding:12px 0;border-bottom:1px solid #eee;cursor:pointer}
+.bi{padding:12px 0;border-bottom:1px solid #eee}
 .bi:last-child{border-bottom:none}
 .bi-date{font-size:12px;color:#888}
 .bi-preview{font-size:13px;margin-top:4px;line-height:1.5;color:#333}
-.bi:hover .bi-preview{color:#1a6fa8}
-.send-btn{padding:10px 20px;font-size:14px;font-weight:500;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.send-btn{padding:10px 20px;font-size:14px;font-weight:500;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer}
 .send-btn:hover{background:#e0e0e0}
 .empty{text-align:center;padding:2rem;color:#aaa;font-size:13px}
 .reset-link{font-size:12px;color:#aaa;cursor:pointer;text-decoration:underline}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;white-space:nowrap}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
 .toast.on{opacity:1}
 .cnt-badge{font-size:11px;background:#f0f0f0;color:#666;border-radius:4px;padding:2px 6px;margin-left:6px}
 </style>
@@ -89,7 +93,6 @@ h1{font-size:18px;font-weight:500;margin-bottom:4px}
   <div class="tab" onclick="switchTab('history',this)">히스토리</div>
 </div>
 
-<!-- 관심사 -->
 <div id="sec-interests" class="sec on">
   <div class="card" id="ilist"><div class="empty">Supabase에 연결하면 목록이 표시됩니다</div></div>
   <div class="card">
@@ -109,11 +112,10 @@ h1{font-size:18px;font-weight:500;margin-bottom:4px}
       </select>
       <button onclick="addInterest()">+ 추가</button>
     </div>
-    <p class="hint">키워드 예시: AI 콜센터, AICC, 컨택센터 (쉼표로 구분 시 각각 검색 후 합산)</p>
+    <p class="hint">키워드 예시: AI 콜센터, AICC, 컨택센터 (쉼표 구분 시 각각 검색 후 합산)</p>
   </div>
 </div>
 
-<!-- 수신자 -->
 <div id="sec-emails" class="sec">
   <div class="card" id="elist"><div class="empty">Supabase에 연결하면 목록이 표시됩니다</div></div>
   <div class="add-row">
@@ -122,7 +124,6 @@ h1{font-size:18px;font-weight:500;margin-bottom:4px}
   </div>
 </div>
 
-<!-- 발송 설정 -->
 <div id="sec-schedule" class="sec">
   <div class="card">
     <div class="time-row">
@@ -162,7 +163,6 @@ h1{font-size:18px;font-weight:500;margin-bottom:4px}
   </div>
 </div>
 
-<!-- 히스토리 -->
 <div id="sec-history" class="sec">
   <div class="card" id="hlist"><div class="empty">Supabase에 연결하면 히스토리가 표시됩니다</div></div>
 </div>
@@ -177,6 +177,7 @@ var interests = [];
 var emails = [];
 var paused = false;
 var days = [1,2,3,4,5];
+var editingId = null;
 
 function showToast(msg, dur) {
   dur = dur || 2500;
@@ -210,7 +211,7 @@ function connect() {
       loadAll();
     } else {
       document.getElementById('dot').className = 'dot err';
-      showToast('연결 실패 — key 확인 필요 (상태: ' + r.status + ')');
+      showToast('연결 실패 (' + r.status + ')');
     }
   }).catch(function(e) {
     document.getElementById('dot').className = 'dot err';
@@ -262,6 +263,10 @@ function loadInterests() {
   });
 }
 
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function renderInterests() {
   var el = document.getElementById('ilist');
   if (!interests.length) {
@@ -274,30 +279,80 @@ function renderInterests() {
     var typeLabel = item.type === 'news' ? '뉴스' : item.type === 'youtube' ? '유튜브' : '시세';
     var extra = item.extra || {};
     var cnt = extra.count || 5;
-    var borderStyle = i === interests.length - 1 ? 'border-bottom:none' : '';
-    html += '<div class="row" style="' + borderStyle + '">';
-    html += '<div class="rl">';
-    html += '<span class="bdg ' + item.type + '">' + typeLabel + '</span>';
-    html += '<span style="margin-left:8px;font-weight:500">' + escHtml(item.label) + '</span>';
-    html += '<span class="cnt-badge">' + cnt + '건</span>';
-    html += '<div class="rs">' + escHtml(item.target) + '</div>';
-    html += '</div>';
-    html += '<div class="tgl ' + (item.is_active ? 'on' : '') + '" data-id="' + item.id + '" data-active="' + item.is_active + '" onclick="toggleInterest(this)"></div>';
-    html += '<button class="ibt" data-id="' + item.id + '" onclick="delInterest(this)" title="삭제">&#128465;</button>';
-    html += '</div>';
+    var isLast = i === interests.length - 1;
+
+    if (editingId === item.id) {
+      html += '<div class="edit-row">';
+      html += '<div class="edit-row-grid">';
+      html += '<select id="e-type">';
+      html += '<option value="news"' + (item.type==='news'?' selected':'') + '>뉴스</option>';
+      html += '<option value="youtube"' + (item.type==='youtube'?' selected':'') + '>유튜브</option>';
+      html += '<option value="price"' + (item.type==='price'?' selected':'') + '>시세</option>';
+      html += '</select>';
+      html += '<input type="text" id="e-label" value="' + escHtml(item.label) + '" placeholder="이름">';
+      html += '<input type="text" id="e-target" value="' + escHtml(item.target) + '" placeholder="키워드">';
+      html += '<select id="e-count">';
+      html += '<option value="3"' + (cnt===3?' selected':'') + '>3건</option>';
+      html += '<option value="5"' + (cnt===5?' selected':'') + '>5건</option>';
+      html += '<option value="10"' + (cnt===10?' selected':'') + '>10건</option>';
+      html += '</select>';
+      html += '</div>';
+      html += '<div class="edit-btns">';
+      html += '<button class="btn-cancel" onclick="cancelEdit()">취소</button>';
+      html += '<button class="btn-save" onclick="saveEdit(' + item.id + ')">저장</button>';
+      html += '</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="row" style="' + (isLast ? 'border-bottom:none' : '') + '">';
+      html += '<div class="rl">';
+      html += '<span class="bdg ' + item.type + '">' + typeLabel + '</span>';
+      html += '<span style="margin-left:8px;font-weight:500">' + escHtml(item.label) + '</span>';
+      html += '<span class="cnt-badge">' + cnt + '건</span>';
+      html += '<div class="rs">' + escHtml(item.target) + '</div>';
+      html += '</div>';
+      html += '<div class="tgl ' + (item.is_active ? 'on' : '') + '" data-id="' + item.id + '" data-active="' + item.is_active + '" onclick="toggleInterest(this)"></div>';
+      html += '<button class="ibt" data-id="' + item.id + '" onclick="startEdit(' + item.id + ')" title="수정">&#9998;</button>';
+      html += '<button class="ibt" data-id="' + item.id + '" onclick="delInterest(this)" title="삭제">&#128465;</button>';
+      html += '</div>';
+    }
   }
   el.innerHTML = html;
 }
 
-function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function startEdit(id) {
+  editingId = id;
+  renderInterests();
+}
+
+function cancelEdit() {
+  editingId = null;
+  renderInterests();
+}
+
+function saveEdit(id) {
+  var type = document.getElementById('e-type').value;
+  var label = document.getElementById('e-label').value.trim();
+  var target = document.getElementById('e-target').value.trim();
+  var count = parseInt(document.getElementById('e-count').value);
+  if (!label || !target) { showToast('이름과 키워드를 입력하세요'); return; }
+  sf('/rest/v1/briefing_interests?id=eq.' + id, 'PATCH', {
+    type: type, label: label, target: target, extra: {count: count}
+  }).then(function(r) {
+    if (r.ok || r.status === 204) {
+      editingId = null;
+      loadInterests();
+      showToast('수정 완료');
+    } else {
+      showToast('수정 실패: ' + r.status);
+    }
+  });
 }
 
 function toggleInterest(el) {
   var id = el.getAttribute('data-id');
   var cur = el.getAttribute('data-active') === 'true';
   sf('/rest/v1/briefing_interests?id=eq.' + id, 'PATCH', {is_active: !cur}).then(function(r) {
-    if (r.ok) loadInterests();
+    if (r.ok || r.status === 204) loadInterests();
     else showToast('수정 실패: ' + r.status);
   });
 }
@@ -325,8 +380,9 @@ function addInterest() {
   for (var i = 0; i < interests.length; i++) {
     if ((interests[i].sort_order || 0) >= maxOrder) maxOrder = interests[i].sort_order + 1;
   }
-  var body = {type: type, label: label, target: target, extra: {count: count}, is_active: true, sort_order: maxOrder};
-  sf('/rest/v1/briefing_interests', 'POST', body).then(function(r) {
+  sf('/rest/v1/briefing_interests', 'POST', {
+    type: type, label: label, target: target, extra: {count: count}, is_active: true, sort_order: maxOrder
+  }).then(function(r) {
     if (r.ok || r.status === 201) {
       document.getElementById('n-label').value = '';
       document.getElementById('n-target').value = '';
@@ -355,8 +411,8 @@ function renderEmails() {
   }
   var html = '';
   for (var i = 0; i < emails.length; i++) {
-    var borderStyle = i === emails.length - 1 ? 'border-bottom:none' : '';
-    html += '<div class="row" style="' + borderStyle + '">';
+    var isLast = i === emails.length - 1;
+    html += '<div class="row" style="' + (isLast ? 'border-bottom:none' : '') + '">';
     html += '<div class="rl">&#9993; ' + escHtml(emails[i]) + '</div>';
     html += '<button class="ibt" data-idx="' + i + '" onclick="delEmail(this)">&#128465;</button>';
     html += '</div>';
@@ -365,9 +421,7 @@ function renderEmails() {
 }
 
 function saveEmails() {
-  sf('/rest/v1/settings?key=eq.briefing_emails', 'PATCH', {value: emails}).then(function(r) {
-    if (!r.ok) showToast('저장 실패: ' + r.status);
-  });
+  sf('/rest/v1/settings?key=eq.briefing_emails', 'PATCH', {value: emails});
 }
 
 function addEmail() {
@@ -450,12 +504,11 @@ function saveSchedule() {
 function sendNow() {
   if (!key) { showToast('먼저 연결하세요'); return; }
   showToast('발송 중...', 5000);
-  var opts = {
+  fetch(SB + '/functions/v1/daily-briefing?force=true', {
     method: 'POST',
     headers: {'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'},
     body: '{}'
-  };
-  fetch(SB + '/functions/v1/daily-briefing?force=true', opts).then(function(r) {
+  }).then(function(r) {
     return r.json();
   }).then(function(d) {
     if (d.success) showToast('발송 완료 — 뉴스 ' + d.newsCount + '건');
@@ -474,8 +527,8 @@ function loadHistory() {
       var b = data[i];
       var date = new Date(b.created_at).toLocaleString('ko-KR');
       var preview = b.content.replace(/[#*>\-\[\]]/g, '').slice(0, 100) + '...';
-      var borderStyle = i === data.length - 1 ? 'border-bottom:none' : '';
-      html += '<div class="bi" style="' + borderStyle + '">';
+      var isLast = i === data.length - 1;
+      html += '<div class="bi" style="' + (isLast ? 'border-bottom:none' : '') + '">';
       html += '<div class="bi-date">' + date + '</div>';
       html += '<div class="bi-preview">' + escHtml(preview) + '</div>';
       html += '</div>';
