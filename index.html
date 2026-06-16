@@ -2,553 +2,275 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>깡자동 브리핑 설정</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#1a1a1a;padding:1.5rem;max-width:800px;margin:0 auto}
-h1{font-size:18px;font-weight:500;margin-bottom:4px}
-.sub{font-size:13px;color:#666;margin-bottom:1.5rem}
-.api-bar{background:#f0f0f0;border:1px solid #ddd;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:1.5rem}
-.api-bar input{flex:1;border:none;background:transparent;font-size:13px;color:#1a1a1a;outline:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#1a1a1a;padding:24px;max-width:780px;margin:0 auto}
+h1{font-size:18px;font-weight:500}
+.sub{font-size:13px;color:#666;margin:4px 0 20px}
+.bar{background:#f0f0f0;border:1px solid #ddd;border-radius:8px;padding:11px 16px;display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.bar input{flex:1;border:none;background:none;font-size:13px;outline:none}
 .dot{width:8px;height:8px;border-radius:50%;background:#888;flex-shrink:0}
-.dot.ok{background:#1D9E75}
-.dot.err{background:#E24B4A}
-.conn-bar{background:#f0f0f0;border:1px solid #ddd;border-radius:8px;padding:10px 16px;display:none;align-items:center;gap:10px;margin-bottom:1.5rem}
-.tabs{display:flex;border-bottom:1px solid #ddd;margin-bottom:1.5rem}
+.dot.ok{background:#1D9E75}.dot.err{background:#E24B4A}
+.hide{display:none}
+.tabs{display:flex;border-bottom:1px solid #ddd;margin-bottom:20px}
 .tab{padding:8px 16px;font-size:14px;color:#666;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .tab.on{color:#1a1a1a;font-weight:500;border-bottom:2px solid #1a1a1a}
 .sec{display:none}.sec.on{display:block}
 .card{background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px 20px;margin-bottom:12px}
-.row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #eee}
-.row:last-child{border-bottom:none;padding-bottom:0}
-.edit-row{background:#f8f8f8;border-radius:8px;padding:12px;margin:4px 0;border:1px solid #e0e0e0}
-.edit-grid{display:grid;grid-template-columns:80px 1fr 1fr 80px;gap:8px;margin-bottom:8px}
-.edit-grid input,.edit-grid select{font-size:13px;padding:6px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;outline:none;width:100%}
-.edit-btns{display:flex;gap:8px;justify-content:flex-end}
-.edit-btns button{padding:6px 14px;font-size:13px;border:1px solid #ccc;border-radius:8px;cursor:pointer}
-.btn-save{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
-.btn-cancel{background:#f0f0f0;color:#1a1a1a}
+.row{display:flex;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid #eee}
+.row:last-child{border-bottom:none}
 .rl{flex:1;font-size:14px}
 .rs{font-size:12px;color:#888;margin-top:3px}
-.bdg{font-size:11px;padding:3px 8px;border-radius:6px;display:inline-block}
+.bdg{font-size:11px;padding:3px 8px;border-radius:6px}
 .bdg.news{background:#e8f4fd;color:#1a6fa8}
 .bdg.youtube{background:#fdecea;color:#b71c1c}
 .bdg.price{background:#e8f5e9;color:#1b5e20}
-.tgl{width:36px;height:20px;border-radius:10px;background:#ccc;cursor:pointer;position:relative;flex-shrink:0;transition:background .2s;margin-top:2px}
+.cnt{font-size:11px;background:#f0f0f0;color:#666;border-radius:4px;padding:2px 6px;margin-left:6px}
+.tgl{width:36px;height:20px;border-radius:10px;background:#ccc;cursor:pointer;position:relative;flex-shrink:0;margin-top:2px}
 .tgl.on{background:#1D9E75}
-.tgl::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s}
-.tgl.on::after{left:19px}
-.ibt{background:transparent;border:none;cursor:pointer;color:#888;padding:4px 6px;border-radius:4px;font-size:13px;margin-top:1px}
-.ibt:hover{background:#f0f0f0;color:#1a1a1a}
-.form-grid{display:grid;grid-template-columns:80px 1fr 1fr 80px auto;gap:8px;margin-top:12px;align-items:center}
-.form-grid input,.form-grid select{font-size:13px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;outline:none;width:100%}
-.form-grid button{padding:7px 14px;font-size:13px;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer;white-space:nowrap}
-.hint{font-size:11px;color:#aaa;margin-top:6px}
-.add-row{display:flex;gap:8px;margin-top:12px}
-.add-row input{flex:1;font-size:13px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;outline:none}
-.add-row button{padding:7px 14px;font-size:13px;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer}
-.save-btn{width:100%;padding:10px;font-size:14px;font-weight:500;border:none;border-radius:8px;background:#1a1a1a;color:#fff;cursor:pointer;margin-top:12px}
-.save-btn:hover{opacity:.85}
-.time-row{display:flex;align-items:center;gap:12px;padding:12px 0}
-.time-row label{font-size:14px;color:#666;width:80px}
-.time-row select{font-size:14px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;background:#fff}
+.tgl b{position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s}
+.tgl.on b{left:19px}
+.lk{font-size:12px;color:#888;cursor:pointer;padding:2px 6px;margin-top:2px}
+.lk:hover{color:#1a1a1a;text-decoration:underline}
+.grid{display:grid;grid-template-columns:76px 1fr 1fr 70px auto;gap:8px;align-items:center}
+.grid input,.grid select{font-size:13px;padding:7px 9px;border:1px solid #ccc;border-radius:8px;background:#fff;outline:none;width:100%}
+.btn{padding:7px 14px;font-size:13px;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#e4e4e4}
+.btn.dark{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btn.full{width:100%;margin-top:12px;padding:10px;font-weight:500}
+.hint{font-size:11px;color:#aaa;margin-top:8px}
+.edit{background:#f8f8f8;border:1px solid #e0e0e0;border-radius:8px;padding:12px;margin:4px 0}
+.edit .grid{grid-template-columns:76px 1fr 1fr 70px;margin-bottom:8px}
+.ebtns{display:flex;gap:8px;justify-content:flex-end}
+.trow{display:flex;align-items:center;gap:12px;padding:12px 0}
+.trow label{font-size:14px;color:#666;width:80px}
+.trow select{font-size:14px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;background:#fff}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .chip{padding:5px 12px;font-size:12px;border:1px solid #ccc;border-radius:20px;cursor:pointer;color:#666;background:#fff}
 .chip.on{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
-.pause-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid #eee;margin-top:8px}
+.pbar{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid #eee;margin-top:8px}
 .bi{padding:12px 0;border-bottom:1px solid #eee}
 .bi:last-child{border-bottom:none}
-.bi-date{font-size:12px;color:#888}
-.bi-preview{font-size:13px;margin-top:4px;line-height:1.5;color:#333}
-.send-btn{padding:10px 20px;font-size:14px;font-weight:500;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer}
-.send-btn:hover{background:#e0e0e0}
-.empty{text-align:center;padding:2rem;color:#aaa;font-size:13px}
-.reset-link{font-size:12px;color:#aaa;cursor:pointer;text-decoration:underline}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+.bi-d{font-size:12px;color:#888}
+.bi-p{font-size:13px;margin-top:4px;line-height:1.5;color:#333}
+.empty{text-align:center;padding:32px;color:#aaa;font-size:13px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9}
 .toast.on{opacity:1}
-.cnt-badge{font-size:11px;background:#f0f0f0;color:#666;border-radius:4px;padding:2px 6px;margin-left:6px}
 </style>
 </head>
 <body>
 <h1>깡자동 브리핑 설정</h1>
 <p class="sub">관심사, 수신자, 발송 시간을 관리합니다</p>
 
-<div id="api-bar" class="api-bar">
+<div id="bar" class="bar">
   <div class="dot" id="dot"></div>
-  <input type="password" id="apiKey" placeholder="Supabase Legacy anon key (eyJ...) 입력 후 Enter">
-  <button class="ibt" onclick="connect()">연결</button>
+  <input type="password" id="kf" placeholder="Supabase anon key (eyJ...) 입력 후 Enter">
+  <button class="btn" onclick="connect()">연결</button>
 </div>
-<div id="conn-bar" class="conn-bar">
+<div id="cbar" class="bar hide">
   <div class="dot ok"></div>
-  <span style="font-size:13px;color:#666;flex:1">Supabase 연결됨 (자동 저장)</span>
-  <span class="reset-link" onclick="resetKey()">키 초기화</span>
+  <span style="font-size:13px;color:#666;flex:1">연결됨 (자동 저장)</span>
+  <span class="lk" onclick="reset()">키 초기화</span>
 </div>
 
 <div class="tabs">
-  <div class="tab on" onclick="switchTab('interests',this)">관심사</div>
-  <div class="tab" onclick="switchTab('emails',this)">수신자</div>
-  <div class="tab" onclick="switchTab('schedule',this)">발송 설정</div>
-  <div class="tab" onclick="switchTab('history',this)">히스토리</div>
+  <div class="tab on" data-t="i" onclick="tab(this)">관심사</div>
+  <div class="tab" data-t="e" onclick="tab(this)">수신자</div>
+  <div class="tab" data-t="s" onclick="tab(this)">발송 설정</div>
+  <div class="tab" data-t="h" onclick="tab(this)">히스토리</div>
 </div>
 
-<div id="sec-interests" class="sec on">
-  <div class="card" id="ilist"><div class="empty">Supabase에 연결하면 목록이 표시됩니다</div></div>
+<div id="sec-i" class="sec on">
+  <div class="card" id="ilist"><div class="empty">연결하면 목록이 표시됩니다</div></div>
   <div class="card">
     <p style="font-size:13px;font-weight:500;margin-bottom:10px">새 관심사 추가</p>
-    <div class="form-grid">
-      <select id="n-type">
-        <option value="news">뉴스</option>
-        <option value="youtube">유튜브</option>
-        <option value="price">시세</option>
-      </select>
-      <input type="text" id="n-label" placeholder="이름 (예: AI 업계 동향)">
-      <input type="text" id="n-target" placeholder="키워드 (쉼표로 여러 개 가능)">
-      <select id="n-count">
-        <option value="3">3건</option>
-        <option value="5" selected>5건</option>
-        <option value="10">10건</option>
-      </select>
-      <button onclick="addInterest()">+ 추가</button>
+    <div class="grid">
+      <select id="nt"><option value="news">뉴스</option><option value="youtube">유튜브</option><option value="price">시세</option></select>
+      <input id="nl" placeholder="이름">
+      <input id="ng" placeholder="키워드 (쉼표 구분)">
+      <select id="nc"><option value="3">3건</option><option value="5" selected>5건</option><option value="10">10건</option></select>
+      <button class="btn" onclick="add()">추가</button>
     </div>
-    <p class="hint">키워드 예시: AI 콜센터, AICC, 컨택센터 (쉼표 구분시 각각 검색 후 합산)</p>
+    <p class="hint">키워드 쉼표 구분 예: AI 콜센터, AICC, 컨택센터</p>
   </div>
 </div>
 
-<div id="sec-emails" class="sec">
-  <div class="card" id="elist"><div class="empty">Supabase에 연결하면 목록이 표시됩니다</div></div>
-  <div class="add-row">
-    <input type="email" id="n-email" placeholder="이메일 주소 입력">
-    <button onclick="addEmail()">+ 추가</button>
+<div id="sec-e" class="sec">
+  <div class="card" id="elist"><div class="empty">연결하면 목록이 표시됩니다</div></div>
+  <div class="grid" style="grid-template-columns:1fr auto;margin-top:0">
+    <input id="ne" type="email" placeholder="이메일 주소">
+    <button class="btn" onclick="addEmail()">추가</button>
   </div>
 </div>
 
-<div id="sec-schedule" class="sec">
+<div id="sec-s" class="sec">
   <div class="card">
-    <div class="time-row">
+    <div class="trow">
       <label>발송 시간</label>
-      <select id="h-sel">
-        <option value="6">오전 6시</option>
-        <option value="7">오전 7시</option>
-        <option value="8">오전 8시</option>
-        <option value="9" selected>오전 9시</option>
-        <option value="10">오전 10시</option>
-        <option value="11">오전 11시</option>
-        <option value="12">오후 12시</option>
+      <select id="hs">
+        <option value="6">오전 6시</option><option value="7">오전 7시</option><option value="8">오전 8시</option>
+        <option value="9" selected>오전 9시</option><option value="10">오전 10시</option><option value="11">오전 11시</option><option value="12">오후 12시</option>
       </select>
     </div>
     <p style="font-size:13px;color:#666;margin-bottom:8px">발송 요일</p>
-    <div class="chips" id="d-chips">
-      <span class="chip on" data-d="1">월</span>
-      <span class="chip on" data-d="2">화</span>
-      <span class="chip on" data-d="3">수</span>
-      <span class="chip on" data-d="4">목</span>
-      <span class="chip on" data-d="5">금</span>
-      <span class="chip" data-d="6">토</span>
-      <span class="chip" data-d="0">일</span>
+    <div class="chips" id="dc">
+      <span class="chip on" data-d="1">월</span><span class="chip on" data-d="2">화</span><span class="chip on" data-d="3">수</span>
+      <span class="chip on" data-d="4">목</span><span class="chip on" data-d="5">금</span><span class="chip" data-d="6">토</span><span class="chip" data-d="0">일</span>
     </div>
-    <div class="pause-bar">
-      <div>
-        <p style="font-size:14px">발송 일시정지</p>
-        <p style="font-size:12px;color:#888;margin-top:2px">켜면 자동 브리핑이 중단됩니다</p>
-      </div>
-      <div class="tgl" id="p-tgl" onclick="togglePause()"></div>
+    <div class="pbar">
+      <div><p style="font-size:14px">발송 일시정지</p><p style="font-size:12px;color:#888;margin-top:2px">켜면 자동 브리핑이 중단됩니다</p></div>
+      <div class="tgl" id="pt" onclick="togglePause()"><b></b></div>
     </div>
-    <button class="save-btn" onclick="saveSchedule()">스케줄 저장</button>
+    <button class="btn dark full" onclick="saveSched()">스케줄 저장</button>
   </div>
   <div class="card">
     <p style="font-size:13px;color:#666;margin-bottom:12px">지금 바로 브리핑 생성 및 발송</p>
-    <button class="send-btn" onclick="sendNow()">즉시 발송</button>
+    <button class="btn" onclick="sendNow()">즉시 발송</button>
   </div>
 </div>
 
-<div id="sec-history" class="sec">
-  <div class="card" id="hlist"><div class="empty">Supabase에 연결하면 히스토리가 표시됩니다</div></div>
+<div id="sec-h" class="sec">
+  <div class="card" id="hlist"><div class="empty">연결하면 히스토리가 표시됩니다</div></div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-var SB = 'https://zbiwyqwjehnogxkzlhxx.supabase.co';
-var LS_KEY = 'ktis_briefing_sb_key';
-var key = '';
-var interests = [];
-var emails = [];
-var paused = false;
-var days = [1,2,3,4,5];
-var editingId = null;
+var SB='https://zbiwyqwjehnogxkzlhxx.supabase.co',LS='ktis_briefing_sb_key';
+var key='',items=[],emails=[],paused=false,days=[1,2,3,4,5],editId=null;
 
-function showToast(msg, dur) {
-  dur = dur || 2500;
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('on');
-  setTimeout(function(){ t.classList.remove('on'); }, dur);
+function msg(m,d){var t=document.getElementById('toast');t.textContent=m;t.classList.add('on');setTimeout(function(){t.classList.remove('on')},d||2500)}
+function esc(s){return String(s).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;')}
+function $(id){return document.getElementById(id)}
+
+function api(path,method,body){
+  var o={method:method||'GET',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json',Prefer:method==='POST'?'return=representation':'return=minimal'}};
+  if(body!==undefined)o.body=JSON.stringify(body);
+  return fetch(SB+path,o);
 }
 
-function sf(path, method, body) {
-  var opts = {
-    method: method || 'GET',
-    headers: {
-      'apikey': key,
-      'Authorization': 'Bearer ' + key,
-      'Content-Type': 'application/json',
-      'Prefer': method === 'POST' ? 'return=representation' : 'return=minimal'
-    }
-  };
-  if (body !== undefined) opts.body = JSON.stringify(body);
-  return fetch(SB + path, opts);
+function connect(){
+  key=$('kf').value.trim();
+  if(!key)return;
+  api('/rest/v1/settings?select=key&limit=1').then(function(r){
+    if(r.ok){localStorage.setItem(LS,key);conn();loadAll()}
+    else{$('dot').className='dot err';msg('연결 실패 ('+r.status+')')}
+  }).catch(function(e){$('dot').className='dot err';msg('연결 오류: '+e.message)});
+}
+function conn(){$('bar').classList.add('hide');$('cbar').classList.remove('hide')}
+function reset(){localStorage.removeItem(LS);key='';$('cbar').classList.add('hide');$('bar').classList.remove('hide');$('kf').value='';msg('키 초기화됨')}
+
+function start(){
+  var s=localStorage.getItem(LS);
+  if(!s)return;
+  key=s;
+  api('/rest/v1/settings?select=key&limit=1').then(function(r){if(r.ok){conn();loadAll()}else localStorage.removeItem(LS)}).catch(function(){localStorage.removeItem(LS)});
 }
 
-function connect() {
-  key = document.getElementById('apiKey').value.trim();
-  if (!key) return;
-  sf('/rest/v1/settings?select=key&limit=1').then(function(r) {
-    if (r.ok) {
-      localStorage.setItem(LS_KEY, key);
-      showConnected();
-      loadAll();
-    } else {
-      document.getElementById('dot').className = 'dot err';
-      showToast('연결 실패 (' + r.status + ')');
-    }
-  }).catch(function(e) {
-    document.getElementById('dot').className = 'dot err';
-    showToast('연결 오류: ' + e.message);
-  });
-}
+$('kf').addEventListener('keydown',function(e){if(e.key==='Enter')connect()});
 
-function showConnected() {
-  document.getElementById('api-bar').style.display = 'none';
-  document.getElementById('conn-bar').style.display = 'flex';
-}
+function loadAll(){loadItems();loadEmails();loadSched();loadHist()}
 
-function resetKey() {
-  localStorage.removeItem(LS_KEY);
-  key = '';
-  document.getElementById('conn-bar').style.display = 'none';
-  document.getElementById('api-bar').style.display = 'flex';
-  document.getElementById('apiKey').value = '';
-  showToast('키 초기화됨');
-}
+function loadItems(){api('/rest/v1/briefing_interests?select=*&order=sort_order').then(function(r){return r.json()}).then(function(d){items=d;renderItems()})}
 
-function init() {
-  var saved = localStorage.getItem(LS_KEY);
-  if (!saved) return;
-  key = saved;
-  sf('/rest/v1/settings?select=key&limit=1').then(function(r) {
-    if (r.ok) { showConnected(); loadAll(); }
-    else { localStorage.removeItem(LS_KEY); }
-  }).catch(function() { localStorage.removeItem(LS_KEY); });
-}
-
-document.getElementById('apiKey').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') connect();
-});
-
-function loadAll() {
-  loadInterests();
-  loadEmails();
-  loadSchedule();
-  loadHistory();
-}
-
-function loadInterests() {
-  sf('/rest/v1/briefing_interests?select=*&order=sort_order').then(function(r) {
-    return r.json();
-  }).then(function(data) {
-    interests = data;
-    renderInterests();
-  });
-}
-
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function renderInterests() {
-  var el = document.getElementById('ilist');
-  if (!interests.length) {
-    el.innerHTML = '<div class="empty">관심사가 없습니다. 아래에서 추가하세요.</div>';
-    return;
-  }
-  var html = '';
-  for (var i = 0; i < interests.length; i++) {
-    var item = interests[i];
-    var typeLabel = item.type === 'news' ? '뉴스' : item.type === 'youtube' ? '유튜브' : '시세';
-    var extra = item.extra || {};
-    var cnt = extra.count || 5;
-    var isLast = (i === interests.length - 1);
-    var borderStyle = isLast ? 'border-bottom:none' : '';
-
-    if (editingId === item.id) {
-      html += '<div class="edit-row">';
-      html += '<div class="edit-grid">';
-      html += '<select id="e-type">';
-      html += '<option value="news"' + (item.type === 'news' ? ' selected' : '') + '>뉴스</option>';
-      html += '<option value="youtube"' + (item.type === 'youtube' ? ' selected' : '') + '>유튜브</option>';
-      html += '<option value="price"' + (item.type === 'price' ? ' selected' : '') + '>시세</option>';
-      html += '</select>';
-      html += '<input type="text" id="e-label" value="' + escHtml(item.label) + '" placeholder="이름">';
-      html += '<input type="text" id="e-target" value="' + escHtml(item.target) + '" placeholder="키워드">';
-      html += '<select id="e-count">';
-      html += '<option value="3"' + (cnt === 3 ? ' selected' : '') + '>3건</option>';
-      html += '<option value="5"' + (cnt === 5 ? ' selected' : '') + '>5건</option>';
-      html += '<option value="10"' + (cnt === 10 ? ' selected' : '') + '>10건</option>';
-      html += '</select>';
-      html += '</div>';
-      html += '<div class="edit-btns">';
-      html += '<button class="btn-cancel" onclick="cancelEdit()">취소</button>';
-      html += '<button class="btn-save" onclick="saveEdit(' + item.id + ')">저장</button>';
-      html += '</div>';
-      html += '</div>';
-    } else {
-      html += '<div class="row" style="' + borderStyle + '">';
-      html += '<div class="rl">';
-      html += '<span class="bdg ' + item.type + '">' + typeLabel + '</span>';
-      html += '<span style="margin-left:8px;font-weight:500">' + escHtml(item.label) + '</span>';
-      html += '<span class="cnt-badge">' + cnt + '건</span>';
-      html += '<div class="rs">' + escHtml(item.target) + '</div>';
-      html += '</div>';
-      html += '<div class="tgl ' + (item.is_active ? 'on' : '') + '" data-id="' + item.id + '" data-active="' + item.is_active + '" onclick="toggleInterest(this)"></div>';
-      html += '<button class="ibt" onclick="startEdit(' + item.id + ')">수정</button>';
-      html += '<button class="ibt" onclick="delInterest(' + item.id + ')">삭제</button>';
-      html += '</div>';
+function renderItems(){
+  var el=$('ilist');
+  if(!items.length){el.innerHTML='<div class="empty">관심사가 없습니다. 아래에서 추가하세요.</div>';return}
+  var h='';
+  for(var i=0;i<items.length;i++){
+    var x=items[i],t=x.type==='news'?'뉴스':x.type==='youtube'?'유튜브':'시세',c=(x.extra&&x.extra.count)||5;
+    if(editId===x.id){
+      h+='<div class="edit"><div class="grid">';
+      h+='<select id="et"><option value="news"'+(x.type==='news'?' selected':'')+'>뉴스</option><option value="youtube"'+(x.type==='youtube'?' selected':'')+'>유튜브</option><option value="price"'+(x.type==='price'?' selected':'')+'>시세</option></select>';
+      h+='<input id="el" value="'+esc(x.label)+'"><input id="eg" value="'+esc(x.target)+'">';
+      h+='<select id="ec"><option value="3"'+(c===3?' selected':'')+'>3건</option><option value="5"'+(c===5?' selected':'')+'>5건</option><option value="10"'+(c===10?' selected':'')+'>10건</option></select>';
+      h+='</div><div class="ebtns"><button class="btn" onclick="cancel()">취소</button><button class="btn dark" onclick="saveEdit('+x.id+')">저장</button></div></div>';
+    }else{
+      h+='<div class="row"><div class="rl"><span class="bdg '+x.type+'">'+t+'</span><span style="margin-left:8px;font-weight:500">'+esc(x.label)+'</span><span class="cnt">'+c+'건</span><div class="rs">'+esc(x.target)+'</div></div>';
+      h+='<div class="tgl'+(x.is_active?' on':'')+'" onclick="toggle('+x.id+','+x.is_active+')"><b></b></div>';
+      h+='<span class="lk" onclick="edit('+x.id+')">수정</span><span class="lk" onclick="del('+x.id+')">삭제</span></div>';
     }
   }
-  el.innerHTML = html;
+  el.innerHTML=h;
 }
 
-function startEdit(id) {
-  editingId = id;
-  renderInterests();
+function edit(id){editId=id;renderItems()}
+function cancel(){editId=null;renderItems()}
+function saveEdit(id){
+  var t=$('et').value,l=$('el').value.trim(),g=$('eg').value.trim(),c=parseInt($('ec').value);
+  if(!l||!g){msg('이름과 키워드를 입력하세요');return}
+  api('/rest/v1/briefing_interests?id=eq.'+id,'PATCH',{type:t,label:l,target:g,extra:{count:c}}).then(function(r){
+    if(r.ok||r.status===204){editId=null;loadItems();msg('수정 완료')}else msg('수정 실패: '+r.status)
+  });
 }
-
-function cancelEdit() {
-  editingId = null;
-  renderInterests();
-}
-
-function saveEdit(id) {
-  var type = document.getElementById('e-type').value;
-  var label = document.getElementById('e-label').value.trim();
-  var target = document.getElementById('e-target').value.trim();
-  var count = parseInt(document.getElementById('e-count').value);
-  if (!label || !target) { showToast('이름과 키워드를 입력하세요'); return; }
-  sf('/rest/v1/briefing_interests?id=eq.' + id, 'PATCH', {
-    type: type, label: label, target: target, extra: {count: count}
-  }).then(function(r) {
-    if (r.ok || r.status === 204) {
-      editingId = null;
-      loadInterests();
-      showToast('수정 완료');
-    } else {
-      showToast('수정 실패: ' + r.status);
-    }
+function toggle(id,cur){api('/rest/v1/briefing_interests?id=eq.'+id,'PATCH',{is_active:!cur}).then(function(r){if(r.ok||r.status===204)loadItems();else msg('실패: '+r.status)})}
+function del(id){if(!confirm('삭제하시겠습니까?'))return;api('/rest/v1/briefing_interests?id=eq.'+id,'DELETE').then(function(r){if(r.ok||r.status===204){loadItems();msg('삭제됨')}else msg('삭제 실패: '+r.status)})}
+function add(){
+  var t=$('nt').value,l=$('nl').value.trim(),g=$('ng').value.trim(),c=parseInt($('nc').value);
+  if(!l||!g){msg('이름과 키워드를 입력하세요');return}
+  var mo=1;for(var i=0;i<items.length;i++)if((items[i].sort_order||0)>=mo)mo=items[i].sort_order+1;
+  api('/rest/v1/briefing_interests','POST',{type:t,label:l,target:g,extra:{count:c},is_active:true,sort_order:mo}).then(function(r){
+    if(r.ok||r.status===201){$('nl').value='';$('ng').value='';loadItems();msg('추가됨')}else msg('추가 실패: '+r.status)
   });
 }
 
-function toggleInterest(el) {
-  var id = el.getAttribute('data-id');
-  var cur = el.getAttribute('data-active') === 'true';
-  sf('/rest/v1/briefing_interests?id=eq.' + id, 'PATCH', {is_active: !cur}).then(function(r) {
-    if (r.ok || r.status === 204) loadInterests();
-    else showToast('수정 실패: ' + r.status);
-  });
+function loadEmails(){api('/rest/v1/settings?key=eq.briefing_emails&select=value').then(function(r){return r.json()}).then(function(d){emails=(d[0]&&d[0].value)||[];renderEmails()})}
+function renderEmails(){
+  var el=$('elist');
+  if(!emails.length){el.innerHTML='<div class="empty">수신자가 없습니다.</div>';return}
+  var h='';for(var i=0;i<emails.length;i++)h+='<div class="row"><div class="rl">'+esc(emails[i])+'</div><span class="lk" onclick="delEmail('+i+')">삭제</span></div>';
+  el.innerHTML=h;
 }
-
-function delInterest(id) {
-  if (!window.confirm('삭제하시겠습니까?')) return;
-  sf('/rest/v1/briefing_interests?id=eq.' + id, 'DELETE').then(function(r) {
-    if (r.ok || r.status === 204) {
-      loadInterests();
-      showToast('삭제됨');
-    } else {
-      showToast('삭제 실패: ' + r.status);
-    }
-  });
+function saveEmails(){api('/rest/v1/settings?key=eq.briefing_emails','PATCH',{value:emails})}
+function addEmail(){
+  var v=$('ne').value.trim();
+  if(!v||v.indexOf('@')<0){msg('올바른 이메일을 입력하세요');return}
+  if(emails.indexOf(v)>=0){msg('이미 등록됨');return}
+  emails.push(v);saveEmails();$('ne').value='';renderEmails();msg('추가됨');
 }
+function delEmail(i){emails.splice(i,1);saveEmails();renderEmails();msg('삭제됨')}
 
-function addInterest() {
-  var type = document.getElementById('n-type').value;
-  var label = document.getElementById('n-label').value.trim();
-  var target = document.getElementById('n-target').value.trim();
-  var count = parseInt(document.getElementById('n-count').value);
-  if (!label || !target) { showToast('이름과 키워드를 입력하세요'); return; }
-  var maxOrder = 1;
-  for (var i = 0; i < interests.length; i++) {
-    if ((interests[i].sort_order || 0) >= maxOrder) maxOrder = interests[i].sort_order + 1;
+function loadSched(){api('/rest/v1/settings?key=in.(briefing_hour,briefing_days,briefing_paused)&select=key,value').then(function(r){return r.json()}).then(function(d){
+  for(var i=0;i<d.length;i++){
+    if(d[i].key==='briefing_hour')$('hs').value=String(d[i].value);
+    if(d[i].key==='briefing_days')days=d[i].value;
+    if(d[i].key==='briefing_paused')paused=d[i].value===true||d[i].value==='true';
   }
-  sf('/rest/v1/briefing_interests', 'POST', {
-    type: type, label: label, target: target, extra: {count: count}, is_active: true, sort_order: maxOrder
-  }).then(function(r) {
-    if (r.ok || r.status === 201) {
-      document.getElementById('n-label').value = '';
-      document.getElementById('n-target').value = '';
-      loadInterests();
-      showToast('관심사 추가됨');
-    } else {
-      showToast('추가 실패: ' + r.status);
-    }
-  });
+  renderDays();renderPause();
+})}
+function renderDays(){var c=document.querySelectorAll('#dc .chip');for(var i=0;i<c.length;i++){var d=parseInt(c[i].getAttribute('data-d'));c[i].className='chip'+(days.indexOf(d)>=0?' on':'')}}
+function renderPause(){$('pt').className='tgl'+(paused?' on':'')}
+$('dc').addEventListener('click',function(e){var c=e.target.closest('.chip');if(!c)return;var d=parseInt(c.getAttribute('data-d')),i=days.indexOf(d);if(i>=0)days.splice(i,1);else days.push(d);renderDays()});
+function togglePause(){paused=!paused;renderPause()}
+function up(k,v){return api('/rest/v1/settings?key=eq.'+k).then(function(r){return r.json()}).then(function(d){return d.length?api('/rest/v1/settings?key=eq.'+k,'PATCH',{value:v}):api('/rest/v1/settings','POST',{key:k,value:v})})}
+function saveSched(){Promise.all([up('briefing_hour',$('hs').value),up('briefing_days',days),up('briefing_paused',paused)]).then(function(){msg('스케줄 저장 완료')})}
+
+function sendNow(){
+  if(!key){msg('먼저 연결하세요');return}
+  msg('발송 중...',5000);
+  fetch(SB+'/functions/v1/daily-briefing?force=true',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json()}).then(function(d){
+    if(d.success)msg('발송 완료 - 뉴스 '+d.newsCount+'건');else msg('발송 실패')
+  }).catch(function(e){msg('오류: '+e.message)});
 }
 
-function loadEmails() {
-  sf('/rest/v1/settings?key=eq.briefing_emails&select=value').then(function(r) {
-    return r.json();
-  }).then(function(d) {
-    emails = (d[0] && d[0].value) ? d[0].value : [];
-    renderEmails();
-  });
+function loadHist(){api('/rest/v1/briefings?select=id,content,created_at&order=created_at.desc&limit=10').then(function(r){return r.json()}).then(function(d){
+  var el=$('hlist');
+  if(!d.length){el.innerHTML='<div class="empty">아직 브리핑 기록이 없습니다</div>';return}
+  var h='';for(var i=0;i<d.length;i++){var dt=new Date(d[i].created_at).toLocaleString('ko-KR'),p=d[i].content.replace(/[#*>]/g,'').slice(0,100)+'...';h+='<div class="bi"><div class="bi-d">'+dt+'</div><div class="bi-p">'+esc(p)+'</div></div>'}
+  el.innerHTML=h;
+})}
+
+function tab(el){
+  var ts=document.querySelectorAll('.tab'),ss=document.querySelectorAll('.sec');
+  for(var i=0;i<ts.length;i++)ts[i].classList.remove('on');
+  for(var i=0;i<ss.length;i++)ss[i].classList.remove('on');
+  el.classList.add('on');$('sec-'+el.getAttribute('data-t')).classList.add('on');
 }
 
-function renderEmails() {
-  var el = document.getElementById('elist');
-  if (!emails.length) {
-    el.innerHTML = '<div class="empty">수신자가 없습니다.</div>';
-    return;
-  }
-  var html = '';
-  for (var i = 0; i < emails.length; i++) {
-    var isLast = (i === emails.length - 1);
-    html += '<div class="row" style="' + (isLast ? 'border-bottom:none' : '') + '">';
-    html += '<div class="rl">' + escHtml(emails[i]) + '</div>';
-    html += '<button class="ibt" onclick="delEmail(' + i + ')">삭제</button>';
-    html += '</div>';
-  }
-  el.innerHTML = html;
-}
-
-function saveEmails() {
-  sf('/rest/v1/settings?key=eq.briefing_emails', 'PATCH', {value: emails});
-}
-
-function addEmail() {
-  var v = document.getElementById('n-email').value.trim();
-  if (!v || v.indexOf('@') < 0) { showToast('올바른 이메일을 입력하세요'); return; }
-  if (emails.indexOf(v) >= 0) { showToast('이미 등록된 이메일입니다'); return; }
-  emails.push(v);
-  saveEmails();
-  document.getElementById('n-email').value = '';
-  renderEmails();
-  showToast('수신자 추가됨');
-}
-
-function delEmail(idx) {
-  emails.splice(idx, 1);
-  saveEmails();
-  renderEmails();
-  showToast('삭제됨');
-}
-
-function loadSchedule() {
-  sf('/rest/v1/settings?key=in.(briefing_hour,briefing_days,briefing_paused)&select=key,value').then(function(r) {
-    return r.json();
-  }).then(function(d) {
-    for (var i = 0; i < d.length; i++) {
-      if (d[i].key === 'briefing_hour') document.getElementById('h-sel').value = String(d[i].value);
-      if (d[i].key === 'briefing_days') days = d[i].value;
-      if (d[i].key === 'briefing_paused') paused = d[i].value === true || d[i].value === 'true';
-    }
-    renderDays();
-    renderPause();
-  });
-}
-
-function renderDays() {
-  var chips = document.querySelectorAll('#d-chips .chip');
-  for (var i = 0; i < chips.length; i++) {
-    var d = parseInt(chips[i].getAttribute('data-d'));
-    chips[i].className = 'chip' + (days.indexOf(d) >= 0 ? ' on' : '');
-  }
-}
-
-function renderPause() {
-  document.getElementById('p-tgl').className = 'tgl' + (paused ? ' on' : '');
-}
-
-document.getElementById('d-chips').addEventListener('click', function(e) {
-  var chip = e.target.closest('.chip');
-  if (!chip) return;
-  var d = parseInt(chip.getAttribute('data-d'));
-  var idx = days.indexOf(d);
-  if (idx >= 0) days.splice(idx, 1);
-  else days.push(d);
-  renderDays();
-});
-
-function togglePause() { paused = !paused; renderPause(); }
-
-function upsertSetting(k, v) {
-  return sf('/rest/v1/settings?key=eq.' + k, 'GET').then(function(r) {
-    return r.json();
-  }).then(function(d) {
-    if (d.length) return sf('/rest/v1/settings?key=eq.' + k, 'PATCH', {value: v});
-    else return sf('/rest/v1/settings', 'POST', {key: k, value: v});
-  });
-}
-
-function saveSchedule() {
-  var h = document.getElementById('h-sel').value;
-  Promise.all([
-    upsertSetting('briefing_hour', h),
-    upsertSetting('briefing_days', days),
-    upsertSetting('briefing_paused', paused)
-  ]).then(function() {
-    showToast('스케줄 저장 완료');
-  });
-}
-
-function sendNow() {
-  if (!key) { showToast('먼저 연결하세요'); return; }
-  showToast('발송 중...', 5000);
-  fetch(SB + '/functions/v1/daily-briefing?force=true', {
-    method: 'POST',
-    headers: {'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'},
-    body: '{}'
-  }).then(function(r) {
-    return r.json();
-  }).then(function(d) {
-    if (d.success) showToast('발송 완료 - 뉴스 ' + d.newsCount + '건');
-    else showToast('발송 실패');
-  }).catch(function(e) { showToast('오류: ' + e.message); });
-}
-
-function loadHistory() {
-  sf('/rest/v1/briefings?select=id,content,created_at&order=created_at.desc&limit=10').then(function(r) {
-    return r.json();
-  }).then(function(data) {
-    var el = document.getElementById('hlist');
-    if (!data.length) { el.innerHTML = '<div class="empty">아직 브리핑 기록이 없습니다</div>'; return; }
-    var html = '';
-    for (var i = 0; i < data.length; i++) {
-      var b = data[i];
-      var date = new Date(b.created_at).toLocaleString('ko-KR');
-      var preview = b.content.replace(/[#*>\-\[\]]/g, '').slice(0, 100) + '...';
-      var isLast = (i === data.length - 1);
-      html += '<div class="bi" style="' + (isLast ? 'border-bottom:none' : '') + '">';
-      html += '<div class="bi-date">' + date + '</div>';
-      html += '<div class="bi-preview">' + escHtml(preview) + '</div>';
-      html += '</div>';
-    }
-    el.innerHTML = html;
-  });
-}
-
-function switchTab(name, el) {
-  var tabs = document.querySelectorAll('.tab');
-  var secs = document.querySelectorAll('.sec');
-  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('on');
-  for (var i = 0; i < secs.length; i++) secs[i].classList.remove('on');
-  el.classList.add('on');
-  document.getElementById('sec-' + name).classList.add('on');
-}
-
-init();
+start();
 </script>
 </body>
 </html>
