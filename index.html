@@ -191,7 +191,7 @@ function mkDB(key){
       return req('/briefings?order=id.desc&limit=30');
     },
     async invoke(fn){
-      const res=await fetch(`${SUPA_URL}/functions/v1/${fn}`,{
+      const res=await fetch(`${SUPA_URL}/functions/v1/${fn}?force=true`,{
         method:'POST',
         headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'}
       });
