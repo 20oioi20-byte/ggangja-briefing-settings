@@ -505,8 +505,21 @@ function TabSettings({ db }) {
         const d = await db.getSetting('briefing_days');
         const p = await db.getSetting('briefing_paused');
         if (h) setHour(Number(h));
-        if (d) setDays(d.split(','));
-        if (p) setPaused(p === 'true');
+        if (d) {
+          let parsedDays;
+          if (Array.isArray(d)) {
+            parsedDays = d.map(x => String(x).trim()).filter(Boolean);
+          } else {
+            try {
+              const json = JSON.parse(d);
+              parsedDays = Array.isArray(json) ? json.map(x => String(x).trim()).filter(Boolean) : String(d).split(',').map(x => x.trim()).filter(Boolean);
+            } catch {
+              parsedDays = String(d).split(',').map(x => x.trim()).filter(Boolean);
+            }
+          }
+          setDays(parsedDays);
+        }
+        if (p) setPaused(p === 'true' || p === true);
       } catch(e) { toast$(e.message, 'error'); }
       finally { setLoading(false); }
     })();
@@ -601,7 +614,7 @@ function TabHistory({ db }) {
     (async () => {
       try {
         setLoading(true);
-        const data = await db.query('briefings', { order: 'created_at.desc', limit: 30 });
+        const data = await db.query('briefings', { order: 'id.desc', limit: 30 });
         setItems(data);
       } catch(e) { setToast({ msg: e.message, type: 'error' }); }
       finally { setLoading(false); }
@@ -609,7 +622,9 @@ function TabHistory({ db }) {
   }, [db]);
 
   const fmt = (ts) => {
+    if (!ts) return '날짜 없음';
     const d = new Date(ts);
+    if (isNaN(d)) return String(ts);
     return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   };
 
@@ -624,7 +639,7 @@ function TabHistory({ db }) {
         : items.map(item => h('div', { class: 'history-item', key: item.id },
             h('div', { class: 'history-header', onClick: () => setOpen(open === item.id ? null : item.id) },
               h('span', { style: { fontSize: 13, fontWeight: 600 } }, `브리핑 #${item.id}`),
-              h('span', { class: 'history-date' }, fmt(item.created_at))
+              h('span', { class: 'history-date' }, fmt(item.created_at || item.inserted_at || item.timestamp || null))
             ),
             open === item.id && h('div', { class: 'history-body' }, item.content || '(내용 없음)')
           ))
