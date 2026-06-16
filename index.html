@@ -415,7 +415,20 @@ function TabEmails({ db }) {
     try {
       setLoading(true);
       const val = await db.getSetting('briefing_emails');
-      setEmails(val ? val.split(',').map(e => e.trim()).filter(Boolean) : []);
+      if (!val) { setEmails([]); return; }
+      // DB 저장 형태가 배열/JSON/문자열 모두 대응
+      let parsed;
+      if (Array.isArray(val)) {
+        parsed = val.map(e => String(e).trim()).filter(Boolean);
+      } else {
+        try {
+          const json = JSON.parse(val);
+          parsed = Array.isArray(json) ? json.map(e => String(e).trim()).filter(Boolean) : String(val).split(',').map(e => e.trim()).filter(Boolean);
+        } catch {
+          parsed = String(val).split(',').map(e => e.trim()).filter(Boolean);
+        }
+      }
+      setEmails(parsed);
     } catch(e) { toast$(e.message, 'error'); }
     finally { setLoading(false); }
   }, [db]);
@@ -423,7 +436,8 @@ function TabEmails({ db }) {
   useEffect(() => { load(); }, [load]);
 
   const save = async (list) => {
-    await db.upsertSetting('briefing_emails', list.join(','));
+    // 항상 쉼표 구분 문자열로 저장 (배열 저장 방지)
+    await db.upsertSetting('briefing_emails', list.map(e => e.trim()).filter(Boolean).join(','));
     setEmails(list);
   };
 
