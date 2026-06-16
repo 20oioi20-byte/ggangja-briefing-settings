@@ -5,692 +5,588 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>깡자동 브리핑 설정</title>
 <style>
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface2: #22263a;
-    --border: #2e3250;
-    --accent: #4f6ef7;
-    --accent2: #6c8aff;
-    --green: #22c55e;
-    --red: #ef4444;
-    --yellow: #f59e0b;
-    --text: #e8eaf6;
-    --text2: #8b92b8;
-    --text3: #5a6080;
-    --radius: 10px;
-    --font: 'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; min-height: 100vh; }
+:root {
+  --bg:#0f1117; --sur:#1a1d27; --sur2:#22263a; --brd:#2e3250;
+  --acc:#4f6ef7; --acc2:#6c8aff; --grn:#22c55e; --red:#ef4444;
+  --ylw:#f59e0b; --txt:#e8eaf6; --txt2:#8b92b8; --txt3:#5a6080;
+  --r:10px; --f:'Apple SD Gothic Neo',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:var(--f);font-size:14px;line-height:1.6;min-height:100vh}
+#root{max-width:860px;margin:0 auto;padding:24px 16px 60px}
 
-  #root { max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--brd)}
+.logo{font-size:22px;font-weight:800;color:var(--acc2)}
+.logo small{color:var(--txt2);font-weight:400;font-size:14px;margin-left:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--grn);box-shadow:0 0 6px var(--grn);animation:pulse 2s infinite;display:inline-block;margin-right:8px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-  /* Header */
-  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
-  .header-left { display: flex; align-items: center; gap: 12px; }
-  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent2); }
-  .logo span { color: var(--text2); font-weight: 400; font-size: 14px; margin-left: 4px; }
-  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.tabs{display:flex;gap:4px;background:var(--sur);padding:4px;border-radius:var(--r);margin-bottom:24px;flex-wrap:wrap}
+.tab{padding:8px 16px;border-radius:7px;border:none;background:transparent;color:var(--txt2);cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;font-family:var(--f)}
+.tab.on{background:var(--acc);color:#fff;font-weight:700}
+.tab:hover:not(.on){background:var(--sur2);color:var(--txt)}
 
-  /* Tabs */
-  .tabs { display: flex; gap: 4px; background: var(--surface); padding: 4px; border-radius: var(--radius); margin-bottom: 24px; flex-wrap: wrap; }
-  .tab { padding: 8px 16px; border-radius: 7px; border: none; background: transparent; color: var(--text2); cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; white-space: nowrap; }
-  .tab.active { background: var(--accent); color: #fff; font-weight: 600; }
-  .tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+.card{background:var(--sur);border:1px solid var(--brd);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.ctitle{font-size:12px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px}
 
-  /* Card */
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
-  .card-title { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 16px; }
+input,select,textarea{background:var(--sur2);border:1px solid var(--brd);border-radius:7px;color:var(--txt);font-family:var(--f);font-size:13px;padding:8px 12px;outline:none;transition:border-color .15s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+input::placeholder,textarea::placeholder{color:var(--txt3)}
+select option{background:var(--sur2)}
 
-  /* Form elements */
-  input, select, textarea {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
-    color: var(--text); font-family: var(--font); font-size: 13px; padding: 8px 12px;
-    outline: none; transition: border-color .15s;
-  }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-  input::placeholder { color: var(--text3); }
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:7px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--f);white-space:nowrap}
+.btn-p{background:var(--acc);color:#fff}.btn-p:hover{background:var(--acc2)}
+.btn-s{background:var(--sur2);color:var(--txt);border:1px solid var(--brd)}.btn-s:hover{border-color:var(--acc);color:var(--acc2)}
+.btn-d{background:transparent;color:var(--red);border:1px solid transparent;padding:5px 9px}.btn-d:hover{background:rgba(239,68,68,.1);border-color:var(--red)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
 
-  /* Buttons */
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 7px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; font-family: var(--font); white-space: nowrap; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: var(--accent2); }
-  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--accent2); }
-  .btn-danger { background: transparent; color: var(--red); border: 1px solid transparent; padding: 4px 8px; }
-  .btn-danger:hover { background: rgba(239,68,68,.1); border-color: var(--red); }
-  .btn-sm { padding: 5px 10px; font-size: 12px; }
-  .btn-icon { padding: 6px 10px; }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
+.ilist{display:flex;flex-direction:column;gap:8px}
+.irow{display:grid;grid-template-columns:36px 1fr auto auto;gap:10px;align-items:center;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:10px 12px}
+.irow.off{opacity:.5}
+.tgl{width:36px;height:20px;border-radius:10px;border:none;background:var(--brd);cursor:pointer;position:relative;transition:background .2s;padding:0;flex-shrink:0}
+.tgl.on{background:var(--acc)}
+.tgl::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s}
+.tgl.on::after{left:19px}
+.ilabel{font-weight:600;font-size:13px}
+.imeta{font-size:11px;color:var(--txt3);margin-top:2px}
+.badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;background:var(--sur);border:1px solid var(--brd);color:var(--txt2);white-space:nowrap}
+.iact{display:flex;gap:4px}
 
-  /* Interest items */
-  .interest-list { display: flex; flex-direction: column; gap: 8px; }
-  .interest-item { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; transition: border-color .15s; }
-  .interest-item:hover { border-color: var(--border); }
-  .interest-item.inactive { opacity: .5; }
-  .toggle { width: 36px; height: 20px; border-radius: 10px; border: none; background: var(--border); cursor: pointer; position: relative; transition: background .2s; padding: 0; flex-shrink: 0; }
-  .toggle.on { background: var(--accent); }
-  .toggle::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:#fff; transition: left .2s; }
-  .toggle.on::after { left:19px; }
-  .interest-info { overflow: hidden; }
-  .interest-label { font-weight: 600; font-size: 13px; color: var(--text); }
-  .interest-meta { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .type-badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 600; background: var(--surface); border: 1px solid var(--border); color: var(--text2); }
-  .interest-actions { display: flex; gap: 4px; }
+.elist{display:flex;flex-direction:column;gap:6px}
+.erow{display:flex;align-items:center;justify-content:space-between;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;padding:8px 12px;gap:10px}
+.eaddr{font-family:monospace;font-size:13px;word-break:break-all}
 
-  /* Email list */
-  .email-list { display: flex; flex-direction: column; gap: 6px; }
-  .email-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; }
-  .email-addr { font-size: 13px; color: var(--text); font-family: monospace; }
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.grid2{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12px;color:var(--txt2);font-weight:600}
 
-  /* Settings grid */
-  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media(max-width:600px){ .settings-grid { grid-template-columns: 1fr; } }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .field label { font-size: 12px; color: var(--text2); font-weight: 600; }
-  .field input, .field select { width: 100%; }
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.day{padding:7px 12px;border-radius:6px;border:1px solid var(--brd);background:var(--sur2);color:var(--txt2);cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;font-family:var(--f)}
+.day.on{background:var(--acc);border-color:var(--acc);color:#fff}
 
-  /* Days checkboxes */
-  .days-grid { display: flex; gap: 6px; flex-wrap: wrap; }
-  .day-btn { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; font-size: 12px; font-weight: 600; transition: all .15s; }
-  .day-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hist-item{border:1px solid var(--brd);border-radius:8px;margin-bottom:10px;overflow:hidden}
+.hist-hdr{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--sur2);cursor:pointer;user-select:none}
+.hist-body{padding:14px;font-size:12px;color:var(--txt2);line-height:1.9;white-space:pre-wrap;max-height:320px;overflow-y:auto;border-top:1px solid var(--brd)}
 
-  /* History */
-  .history-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
-  .history-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--surface2); cursor: pointer; }
-  .history-body { padding: 14px; font-size: 12px; color: var(--text2); line-height: 1.8; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border-top: 1px solid var(--border); }
-  .history-date { font-size: 12px; color: var(--text3); }
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal{background:var(--sur);border:1px solid var(--brd);border-radius:12px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.mtitle{font-size:16px;font-weight:700;margin-bottom:18px}
+.mact{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.frow{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.frow label{font-size:12px;color:var(--txt2);font-weight:600}
+.frow textarea{min-height:80px;resize:vertical}
 
-  /* Modal */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
-  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
-  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
-  .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-  .form-row label { font-size: 12px; color: var(--text2); font-weight: 600; }
-  .form-row input, .form-row select, .form-row textarea { width: 100%; }
-  .form-row textarea { min-height: 80px; resize: vertical; }
+.toast{position:fixed;bottom:24px;right:24px;z-index:200;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:320px;animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.t-ok{background:var(--grn);color:#fff}
+.t-err{background:var(--red);color:#fff}
+.t-info{background:var(--acc);color:#fff}
 
-  /* Alert */
-  .alert { padding: 10px 14px; border-radius: 7px; font-size: 13px; margin-bottom: 14px; }
-  .alert-info { background: rgba(79,110,247,.15); border: 1px solid rgba(79,110,247,.3); color: #8ba4ff; }
-  .alert-success { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); color: #4ade80; }
-  .alert-error { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+.empty{text-align:center;padding:32px;color:var(--txt3);font-size:13px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.spin-dark{border-color:rgba(100,100,200,.3);border-top-color:var(--acc)}
 
-  /* Key setup */
-  .key-setup { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-  .key-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 36px; max-width: 440px; width: 100%; text-align: center; }
-  .key-box h1 { font-size: 24px; font-weight: 800; color: var(--accent2); margin-bottom: 8px; }
-  .key-box p { color: var(--text2); font-size: 13px; margin-bottom: 24px; }
-  .key-box input { width: 100%; margin-bottom: 12px; font-size: 11px; font-family: monospace; padding: 10px 12px; }
+.key-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.key-box{background:var(--sur);border:1px solid var(--brd);border-radius:14px;padding:36px;max-width:440px;width:100%;text-align:center}
+.key-box h1{font-size:24px;font-weight:800;color:var(--acc2);margin-bottom:8px}
+.key-box p{color:var(--txt2);font-size:13px;margin-bottom:24px}
+.key-box input{margin-bottom:12px;font-size:11px;font-family:monospace}
 
-  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .empty { text-align: center; padding: 32px; color: var(--text3); font-size: 13px; }
-
-  /* Pause banner */
-  .pause-banner { background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
-  .pause-banner span { color: var(--yellow); font-size: 13px; font-weight: 600; }
+.pause-bar{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.pause-bar span{color:var(--ylw);font-size:13px;font-weight:600}
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="module">
-import { h, render, Fragment } from 'https://esm.sh/preact@10.19.3';
-import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
+import{h,render,Fragment}from'https://esm.sh/preact@10.19.3';
+import{useState,useEffect,useCallback,useRef}from'https://esm.sh/preact@10.19.3/hooks';
 
-// ─── Constants (한글 분리) ────────────────────────────────────────
-const STRINGS = {
-  appTitle: '깡자동 브리핑',
-  appSub: '설정 관리',
-  tabs: ['관심사', '수신자', '발송 설정', '히스토리'],
-  typLabels: { news: '뉴스', stock: '주식', trend: '트렌드', custom: '직접' },
-  days: ['월', '화', '수', '목', '금', '토', '일'],
-  dayKeys: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
-  keySetup: {
-    title: '깡자동 브리핑',
-    sub: 'Supabase Anon Key를 입력하여 시작하세요',
-    placeholder: 'eyJhbGci...',
-    btn: '연결하기',
-  },
-  emptyInterest: '등록된 관심사가 없습니다',
-  emptyEmail: '등록된 수신자가 없습니다',
-  emptyHistory: '브리핑 히스토리가 없습니다',
-  sendNow: '즉시 발송',
-  paused: '브리핑 일시정지 중',
-  resume: '재개',
-};
+/* ── 상수 ── */
+const SUPA_URL='https://zbiwyqwjehnogxkzlhxx.supabase.co';
+const KEY_LS='ggangja_anon_key';
+const DAYS_KR=['월','화','수','목','금','토','일'];
+// DB에 숫자 배열 [1,2,3,4,5] 로 저장됨 (1=월 ~ 7=일)
+const DAY_NUMS=[1,2,3,4,5,6,7];
+const TYPES={news:'뉴스',stock:'주식',trend:'트렌드',custom:'직접'};
+const COUNTS=[3,5,10,15,20];
 
-const SUPABASE_URL = 'https://zbiwyqwjehnogxkzlhxx.supabase.co';
-const ANON_KEY_STORAGE = 'ggangja_anon_key';
-const TYPE_OPTIONS = ['news', 'stock', 'trend', 'custom'];
-const COUNT_OPTIONS = [3, 5, 10, 15, 20];
+/* ── 값 정규화 헬퍼 ── */
+function toArray(v){
+  if(v==null)return[];
+  if(Array.isArray(v))return v;
+  try{const p=JSON.parse(v);if(Array.isArray(p))return p;}catch{}
+  return String(v).split(',').map(x=>x.trim()).filter(Boolean);
+}
+function toStr(v){
+  if(v==null)return'';
+  if(typeof v==='string')return v;
+  return String(v);
+}
+function toBool(v){
+  if(typeof v==='boolean')return v;
+  return v==='true';
+}
+function toNum(v,def=0){
+  const n=Number(v);
+  return isNaN(n)?def:n;
+}
+function fmtDate(ts){
+  if(!ts)return'';
+  const d=new Date(ts);
+  if(isNaN(d))return toStr(ts);
+  return`${d.getFullYear()}.${p2(d.getMonth()+1)}.${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+function p2(n){return String(n).padStart(2,'0')}
 
-// ─── Supabase client (minimal) ───────────────────────────────────
-function createClient(anonKey) {
-  const headers = {
-    'apikey': anonKey,
-    'Authorization': `Bearer ${anonKey}`,
-    'Content-Type': 'application/json',
+/* ── Supabase 클라이언트 (순수 fetch) ── */
+function mkDB(key){
+  const H={apikey:key,'Authorization':'Bearer '+key,'Content-Type':'application/json'};
+  const B=SUPA_URL+'/rest/v1';
+
+  async function req(path,opts={}){
+    const res=await fetch(B+path,{headers:H,...opts});
+    const txt=await res.text();
+    if(!res.ok)throw new Error(txt||res.statusText);
+    return txt?JSON.parse(txt):[];
+  }
+
+  return{
+    async getInterests(){
+      return req('/briefing_interests?order=sort_order.asc,id.asc');
+    },
+    async addInterest(d){
+      return req('/briefing_interests',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+    },
+    async updateInterest(id,d){
+      return req(`/briefing_interests?id=eq.${id}`,{method:'PATCH',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+    },
+    async deleteInterest(id){
+      return req(`/briefing_interests?id=eq.${id}`,{method:'DELETE'});
+    },
+    async getSettings(){
+      const rows=await req('/settings');
+      const m={};
+      rows.forEach(r=>{m[r.key]=r.value;});
+      return m;
+    },
+    async setSetting(key,value){
+      // PATCH 먼저, 없으면 INSERT
+      const patch=await fetch(`${B}/settings?key=eq.${key}`,{
+        method:'PATCH',headers:{...H,Prefer:'return=representation'},
+        body:JSON.stringify({value})
+      });
+      const ptxt=await patch.text();
+      const pdata=ptxt?JSON.parse(ptxt):[];
+      if(!patch.ok)throw new Error(ptxt);
+      if(Array.isArray(pdata)&&pdata.length===0){
+        return req('/settings',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify({key,value})});
+      }
+    },
+    async getBriefings(){
+      // 컬럼명 불확실 → select * + id desc
+      return req('/briefings?order=id.desc&limit=30');
+    },
+    async invoke(fn){
+      const res=await fetch(`${SUPA_URL}/functions/v1/${fn}`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'}
+      });
+      const txt=await res.text();
+      if(!res.ok)throw new Error(txt||res.statusText);
+      return txt?JSON.parse(txt):{};
+    }
   };
-  const base = `${SUPABASE_URL}/rest/v1`;
-
-  async function query(table, opts = {}) {
-    const params = new URLSearchParams();
-    if (opts.select) params.set('select', opts.select);
-    if (opts.order) params.set('order', opts.order);
-    if (opts.limit) params.set('limit', opts.limit);
-    if (opts.eq) Object.entries(opts.eq).forEach(([k, v]) => params.set(k, `eq.${v}`));
-    const url = `${base}/${table}?${params}`;
-    const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  }
-
-  async function insert(table, data) {
-    const res = await fetch(`${base}/${table}`, {
-      method: 'POST',
-      headers: { ...headers, 'Prefer': 'return=representation' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  }
-
-  async function update(table, id, data) {
-    const res = await fetch(`${base}/${table}?id=eq.${id}`, {
-      method: 'PATCH',
-      headers: { ...headers, 'Prefer': 'return=representation' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  }
-
-  async function remove(table, id) {
-    const res = await fetch(`${base}/${table}?id=eq.${id}`, {
-      method: 'DELETE', headers,
-    });
-    if (!res.ok) throw new Error(await res.text());
-  }
-
-  async function upsertSetting(key, value) {
-    const res = await fetch(`${base}/settings?key=eq.${key}`, {
-      method: 'PATCH',
-      headers: { ...headers, 'Prefer': 'return=representation' },
-      body: JSON.stringify({ value }),
-    });
-    const data = await res.json();
-    if (!data || data.length === 0) {
-      return insert('settings', { key, value });
-    }
-    return data;
-  }
-
-  async function getSetting(key) {
-    const data = await query('settings', { eq: { key } });
-    return data?.[0]?.value ?? null;
-  }
-
-  async function invokeFn(name) {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${anonKey}`, 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  }
-
-  return { query, insert, update, remove, upsertSetting, getSetting, invokeFn };
 }
 
-// ─── Toast ───────────────────────────────────────────────────────
-function Toast({ msg, type, onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, []);
-  return h('div', {
-    style: {
-      position: 'fixed', bottom: 24, right: 24, zIndex: 200,
-      background: type === 'error' ? 'var(--red)' : type === 'success' ? 'var(--green)' : 'var(--accent)',
-      color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-      boxShadow: '0 4px 20px rgba(0,0,0,.4)', maxWidth: 320,
-      animation: 'fadeIn .2s ease',
-    }
-  }, msg);
+/* ── Toast ── */
+function Toast({msg,cls,onClose}){
+  useEffect(()=>{const t=setTimeout(onClose,3500);return()=>clearTimeout(t)},[]);
+  return h('div',{class:`toast ${cls}`},msg);
+}
+function useToast(){
+  const[t,setT]=useState(null);
+  const show=(msg,type='ok')=>setT({msg,cls:'t-'+type});
+  const el=t&&h(Toast,{...t,onClose:()=>setT(null)});
+  return[show,el];
 }
 
-// ─── Modal ───────────────────────────────────────────────────────
-function Modal({ title, children, onClose }) {
-  useEffect(() => {
-    const esc = e => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', esc);
-    return () => document.removeEventListener('keydown', esc);
-  }, []);
-  return h('div', { class: 'modal-overlay', onClick: e => e.target === e.currentTarget && onClose() },
-    h('div', { class: 'modal' },
-      h('div', { class: 'modal-title' }, title),
+/* ── Modal ── */
+function Modal({title,onClose,children}){
+  useEffect(()=>{
+    const f=e=>{if(e.key==='Escape')onClose();};
+    document.addEventListener('keydown',f);
+    return()=>document.removeEventListener('keydown',f);
+  },[]);
+  return h('div',{class:'overlay',onClick:e=>e.target===e.currentTarget&&onClose()},
+    h('div',{class:'modal'},
+      h('div',{class:'mtitle'},title),
       children
     )
   );
 }
 
-// ─── Interest Modal ───────────────────────────────────────────────
-function InterestModal({ item, onSave, onClose }) {
-  const isEdit = !!item?.id;
-  const [form, setForm] = useState({
-    type: item?.type || 'news',
-    label: item?.label || '',
-    target: item?.target || '',
-    extra: item?.extra || 5,
-    sort_order: item?.sort_order || 0,
+/* ── 관심사 모달 ── */
+function InterestModal({item,onSave,onClose}){
+  const isEdit=!!item?.id;
+  const[f,setF]=useState({
+    type:item?.type||'news',
+    label:item?.label||'',
+    target:item?.target||'',
+    extra:item?.extra||5,
+    sort_order:item?.sort_order||0,
+    is_active:item?.is_active!==false
   });
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  return h(Modal, { title: isEdit ? '관심사 수정' : '관심사 추가', onClose },
-    h('div', { class: 'form-row' },
-      h('label', null, '유형'),
-      h('select', { value: form.type, onChange: e => set('type', e.target.value) },
-        TYPE_OPTIONS.map(t => h('option', { value: t }, STRINGS.typLabels[t]))
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  return h(Modal,{title:isEdit?'관심사 수정':'관심사 추가',onClose},
+    h('div',{class:'frow'},h('label',null,'유형'),
+      h('select',{value:f.type,onChange:e=>set('type',e.target.value)},
+        Object.entries(TYPES).map(([v,l])=>h('option',{value:v},l))
       )
     ),
-    h('div', { class: 'form-row' },
-      h('label', null, '이름'),
-      h('input', { placeholder: '예: 코스피, 반도체 동향', value: form.label, onInput: e => set('label', e.target.value) })
+    h('div',{class:'frow'},h('label',null,'이름'),
+      h('input',{placeholder:'예: 코스피 지수',value:f.label,onInput:e=>set('label',e.target.value)})
     ),
-    h('div', { class: 'form-row' },
-      h('label', null, '키워드 (쉼표 구분)'),
-      h('textarea', { placeholder: '예: 코스피, KOSPI, 주가지수', value: form.target, onInput: e => set('target', e.target.value) })
+    h('div',{class:'frow'},h('label',null,'키워드 (쉼표 구분)'),
+      h('textarea',{placeholder:'예: 코스피, KOSPI, 주가지수',value:f.target,onInput:e=>set('target',e.target.value)})
     ),
-    h('div', { class: 'form-row' },
-      h('label', null, `수집 건수 (현재: ${form.extra}건)`),
-      h('select', { value: form.extra, onChange: e => set('extra', Number(e.target.value)) },
-        COUNT_OPTIONS.map(n => h('option', { value: n }, `${n}건`))
+    h('div',{class:'frow'},h('label',null,`수집 건수 — ${f.extra}건`),
+      h('select',{value:f.extra,onChange:e=>set('extra',Number(e.target.value))},
+        COUNTS.map(n=>h('option',{value:n},`${n}건`))
       )
     ),
-    h('div', { class: 'form-row' },
-      h('label', null, '정렬 순서'),
-      h('input', { type: 'number', value: form.sort_order, onInput: e => set('sort_order', Number(e.target.value)) })
+    h('div',{class:'frow'},h('label',null,'정렬 순서'),
+      h('input',{type:'number',value:f.sort_order,onInput:e=>set('sort_order',Number(e.target.value))})
     ),
-    h('div', { class: 'modal-actions' },
-      h('button', { class: 'btn btn-secondary', onClick: onClose }, '취소'),
-      h('button', { class: 'btn btn-primary', onClick: () => onSave(form), disabled: !form.label.trim() }, '저장')
+    h('div',{class:'mact'},
+      h('button',{class:'btn btn-s',onClick:onClose},'취소'),
+      h('button',{class:'btn btn-p',disabled:!f.label.trim(),onClick:()=>onSave(f)},'저장')
     )
   );
 }
 
-// ─── Tab: 관심사 ─────────────────────────────────────────────────
-function TabInterests({ db }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // null | 'add' | item
-  const [toast, setToast] = useState(null);
+/* ── Tab: 관심사 ── */
+function TabInterests({db}){
+  const[items,setItems]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[modal,setModal]=useState(null);
+  const[toast,toastEl]=useToast();
 
-  const toast$ = (msg, type = 'success') => setToast({ msg, type });
+  const load=useCallback(async()=>{
+    try{setLoading(true);setItems(await db.getInterests());}
+    catch(e){toast(e.message,'err');}
+    finally{setLoading(false);}
+  },[db]);
+  useEffect(()=>{load();},[load]);
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await db.query('briefing_interests', { order: 'sort_order.asc,id.asc' });
-      setItems(data);
-    } catch(e) { toast$(e.message, 'error'); }
-    finally { setLoading(false); }
-  }, [db]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const toggle = async (item) => {
-    try {
-      await db.update('briefing_interests', item.id, { is_active: !item.is_active });
-      setItems(items.map(i => i.id === item.id ? { ...i, is_active: !i.is_active } : i));
-    } catch(e) { toast$(e.message, 'error'); }
+  const toggle=async(item)=>{
+    try{
+      await db.updateInterest(item.id,{is_active:!item.is_active});
+      setItems(it=>it.map(i=>i.id===item.id?{...i,is_active:!i.is_active}:i));
+    }catch(e){toast(e.message,'err');}
   };
-
-  const remove = async (id) => {
-    if (!confirm('삭제하시겠습니까?')) return;
-    try {
-      await db.remove('briefing_interests', id);
-      setItems(items.filter(i => i.id !== id));
-      toast$('삭제되었습니다');
-    } catch(e) { toast$(e.message, 'error'); }
+  const remove=async(id)=>{
+    if(!confirm('삭제하시겠습니까?'))return;
+    try{await db.deleteInterest(id);setItems(it=>it.filter(i=>i.id!==id));toast('삭제되었습니다');}
+    catch(e){toast(e.message,'err');}
   };
-
-  const save = async (form) => {
-    try {
-      if (modal?.id) {
-        await db.update('briefing_interests', modal.id, form);
-        setItems(items.map(i => i.id === modal.id ? { ...i, ...form } : i));
-        toast$('수정되었습니다');
-      } else {
-        const rows = await db.insert('briefing_interests', { ...form, is_active: true });
-        setItems([...items, rows[0]]);
-        toast$('추가되었습니다');
+  const save=async(form)=>{
+    try{
+      if(modal?.id){
+        await db.updateInterest(modal.id,form);
+        toast('수정되었습니다');
+      }else{
+        await db.addInterest({...form,is_active:true});
+        toast('추가되었습니다');
       }
-      setModal(null);
-      load();
-    } catch(e) { toast$(e.message, 'error'); }
+      setModal(null);load();
+    }catch(e){toast(e.message,'err');}
   };
 
-  return h(Fragment, null,
-    toast && h(Toast, { msg: toast.msg, type: toast.type, onClose: () => setToast(null) }),
-    modal && h(InterestModal, { item: modal === 'add' ? null : modal, onSave: save, onClose: () => setModal(null) }),
-    h('div', { class: 'card' },
-      h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 } },
-        h('div', { class: 'card-title', style: { margin: 0 } }, `관심사 목록 (${items.length}개)`),
-        h('button', { class: 'btn btn-primary btn-sm', onClick: () => setModal('add') }, '+ 추가')
+  return h(Fragment,null,
+    toastEl,
+    modal!==null&&h(InterestModal,{item:modal==='add'?null:modal,onSave:save,onClose:()=>setModal(null)}),
+    h('div',{class:'card'},
+      h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px'},
+        h('div',{class:'ctitle',style:'margin:0'},`관심사 목록 (${items.length}개)`),
+        h('button',{class:'btn btn-p btn-sm',onClick:()=>setModal('add')},'+ 추가')
       ),
-      loading
-        ? h('div', { class: 'empty' }, h('div', { class: 'spinner' }))
-        : items.length === 0
-          ? h('div', { class: 'empty' }, STRINGS.emptyInterest)
-          : h('div', { class: 'interest-list' },
-              items.map(item => h('div', { class: `interest-item ${item.is_active ? '' : 'inactive'}`, key: item.id },
-                h('button', { class: `toggle ${item.is_active ? 'on' : ''}`, onClick: () => toggle(item), title: item.is_active ? '비활성화' : '활성화' }),
-                h('div', { class: 'interest-info' },
-                  h('div', { class: 'interest-label' }, item.label),
-                  h('div', { class: 'interest-meta' }, `${item.target || '키워드 없음'} · ${item.extra || 5}건`)
-                ),
-                h('span', { class: 'type-badge' }, STRINGS.typLabels[item.type] || item.type),
-                h('div', { class: 'interest-actions' },
-                  h('button', { class: 'btn btn-secondary btn-sm btn-icon', onClick: () => setModal(item), title: '수정' }, '✏️'),
-                  h('button', { class: 'btn btn-danger btn-sm btn-icon', onClick: () => remove(item.id), title: '삭제' }, '🗑️')
-                )
-              ))
-            )
-    )
-  );
-}
-
-// ─── Tab: 수신자 ─────────────────────────────────────────────────
-function TabEmails({ db }) {
-  const [emails, setEmails] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-  const toast$ = (msg, type = 'success') => setToast({ msg, type });
-
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const val = await db.getSetting('briefing_emails');
-      if (!val) { setEmails([]); return; }
-      // DB 저장 형태가 배열/JSON/문자열 모두 대응
-      let parsed;
-      if (Array.isArray(val)) {
-        parsed = val.map(e => String(e).trim()).filter(Boolean);
-      } else {
-        try {
-          const json = JSON.parse(val);
-          parsed = Array.isArray(json) ? json.map(e => String(e).trim()).filter(Boolean) : String(val).split(',').map(e => e.trim()).filter(Boolean);
-        } catch {
-          parsed = String(val).split(',').map(e => e.trim()).filter(Boolean);
-        }
-      }
-      setEmails(parsed);
-    } catch(e) { toast$(e.message, 'error'); }
-    finally { setLoading(false); }
-  }, [db]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const save = async (list) => {
-    // 항상 쉼표 구분 문자열로 저장 (배열 저장 방지)
-    await db.upsertSetting('briefing_emails', list.map(e => e.trim()).filter(Boolean).join(','));
-    setEmails(list);
-  };
-
-  const add = async () => {
-    const email = input.trim();
-    if (!email || !email.includes('@')) { toast$('올바른 이메일 주소를 입력하세요', 'error'); return; }
-    if (emails.includes(email)) { toast$('이미 등록된 이메일입니다', 'error'); return; }
-    try {
-      await save([...emails, email]);
-      setInput('');
-      toast$('추가되었습니다');
-    } catch(e) { toast$(e.message, 'error'); }
-  };
-
-  const remove = async (email) => {
-    if (!confirm(`${email}을 삭제하시겠습니까?`)) return;
-    try {
-      await save(emails.filter(e => e !== email));
-      toast$('삭제되었습니다');
-    } catch(e) { toast$(e.message, 'error'); }
-  };
-
-  return h(Fragment, null,
-    toast && h(Toast, { msg: toast.msg, type: toast.type, onClose: () => setToast(null) }),
-    h('div', { class: 'card' },
-      h('div', { class: 'card-title' }, '수신자 관리'),
-      h('div', { style: { display: 'flex', gap: 8, marginBottom: 14 } },
-        h('input', {
-          placeholder: 'email@example.com', value: input,
-          onInput: e => setInput(e.target.value),
-          onKeyDown: e => e.key === 'Enter' && add(),
-          style: { flex: 1 }
-        }),
-        h('button', { class: 'btn btn-primary', onClick: add }, '추가')
-      ),
-      loading
-        ? h('div', { class: 'empty' }, h('div', { class: 'spinner' }))
-        : emails.length === 0
-          ? h('div', { class: 'empty' }, STRINGS.emptyEmail)
-          : h('div', { class: 'email-list' },
-              emails.map(email => h('div', { class: 'email-row', key: email },
-                h('span', { class: 'email-addr' }, email),
-                h('button', { class: 'btn btn-danger btn-sm', onClick: () => remove(email) }, '삭제')
-              ))
-            )
-    )
-  );
-}
-
-// ─── Tab: 발송 설정 ───────────────────────────────────────────────
-function TabSettings({ db }) {
-  const [hour, setHour] = useState(9);
-  const [days, setDays] = useState(['MON','TUE','WED','THU','FRI']);
-  const [paused, setPaused] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [toast, setToast] = useState(null);
-  const toast$ = (msg, type = 'success') => setToast({ msg, type });
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const h = await db.getSetting('briefing_hour');
-        const d = await db.getSetting('briefing_days');
-        const p = await db.getSetting('briefing_paused');
-        if (h) setHour(Number(h));
-        if (d) {
-          let parsedDays;
-          if (Array.isArray(d)) {
-            parsedDays = d.map(x => String(x).trim()).filter(Boolean);
-          } else {
-            try {
-              const json = JSON.parse(d);
-              parsedDays = Array.isArray(json) ? json.map(x => String(x).trim()).filter(Boolean) : String(d).split(',').map(x => x.trim()).filter(Boolean);
-            } catch {
-              parsedDays = String(d).split(',').map(x => x.trim()).filter(Boolean);
-            }
-          }
-          setDays(parsedDays);
-        }
-        if (p) setPaused(p === 'true' || p === true);
-      } catch(e) { toast$(e.message, 'error'); }
-      finally { setLoading(false); }
-    })();
-  }, [db]);
-
-  const toggleDay = (key) => {
-    setDays(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key]);
-  };
-
-  const saveAll = async () => {
-    try {
-      await db.upsertSetting('briefing_hour', String(hour));
-      await db.upsertSetting('briefing_days', days.join(','));
-      await db.upsertSetting('briefing_paused', String(paused));
-      toast$('설정이 저장되었습니다');
-    } catch(e) { toast$(e.message, 'error'); }
-  };
-
-  const sendNow = async () => {
-    setSending(true);
-    try {
-      await db.invokeFn('daily-briefing');
-      toast$('브리핑을 발송했습니다');
-    } catch(e) { toast$(e.message, 'error'); }
-    finally { setSending(false); }
-  };
-
-  const togglePause = async () => {
-    const next = !paused;
-    setPaused(next);
-    try {
-      await db.upsertSetting('briefing_paused', String(next));
-      toast$(next ? '브리핑을 일시정지했습니다' : '브리핑을 재개했습니다');
-    } catch(e) { toast$(e.message, 'error'); }
-  };
-
-  if (loading) return h('div', { class: 'card' }, h('div', { class: 'empty' }, h('div', { class: 'spinner' })));
-
-  return h(Fragment, null,
-    toast && h(Toast, { msg: toast.msg, type: toast.type, onClose: () => setToast(null) }),
-    paused && h('div', { class: 'pause-banner' },
-      h('span', null, `⏸ ${STRINGS.paused}`),
-      h('button', { class: 'btn btn-secondary btn-sm', onClick: togglePause }, STRINGS.resume)
-    ),
-    h('div', { class: 'card' },
-      h('div', { class: 'card-title' }, '발송 시간'),
-      h('div', { class: 'settings-grid' },
-        h('div', { class: 'field' },
-          h('label', null, '발송 시각 (시)'),
-          h('input', { type: 'number', min: 0, max: 23, value: hour, onInput: e => setHour(Number(e.target.value)) })
-        ),
-        h('div', { class: 'field' },
-          h('label', null, '현재 설정'),
-          h('div', { style: { padding: '8px 0', color: 'var(--text2)', fontSize: 13 } }, `매일 ${hour}:00`)
-        )
-      )
-    ),
-    h('div', { class: 'card' },
-      h('div', { class: 'card-title' }, '발송 요일'),
-      h('div', { class: 'days-grid' },
-        STRINGS.dayKeys.map((key, i) =>
-          h('button', { class: `day-btn ${days.includes(key) ? 'on' : ''}`, onClick: () => toggleDay(key) },
-            STRINGS.days[i]
+      loading?h('div',{class:'empty'},h('span',{class:'spin spin-dark'})):
+      items.length===0?h('div',{class:'empty'},'등록된 관심사가 없습니다'):
+      h('div',{class:'ilist'},items.map(item=>
+        h('div',{class:`irow${item.is_active?'':' off'}`,key:item.id},
+          h('button',{class:`tgl${item.is_active?' on':''}`,onClick:()=>toggle(item)}),
+          h('div',null,
+            h('div',{class:'ilabel'},item.label),
+            h('div',{class:'imeta'},`${item.target||'키워드 없음'} · ${item.extra||5}건`)
+          ),
+          h('span',{class:'badge'},TYPES[item.type]||item.type),
+          h('div',{class:'iact'},
+            h('button',{class:'btn btn-s btn-sm',onClick:()=>setModal(item)},'✏️'),
+            h('button',{class:'btn btn-d btn-sm',onClick:()=>remove(item.id)},'🗑️')
           )
         )
-      )
-    ),
-    h('div', { class: 'card' },
-      h('div', { class: 'card-title' }, '제어'),
-      h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
-        h('button', { class: 'btn btn-primary', onClick: saveAll }, '설정 저장'),
-        h('button', { class: 'btn btn-secondary', onClick: sendNow, disabled: sending },
-          sending ? h('span', { class: 'spinner' }) : null,
-          ` ${STRINGS.sendNow}`
-        ),
-        h('button', { class: `btn ${paused ? 'btn-primary' : 'btn-secondary'}`, onClick: togglePause },
-          paused ? '▶ 재개' : '⏸ 일시정지'
-        )
-      )
+      ))
     )
   );
 }
 
-// ─── Tab: 히스토리 ────────────────────────────────────────────────
-function TabHistory({ db }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(null);
-  const [toast, setToast] = useState(null);
+/* ── Tab: 수신자 ── */
+function TabEmails({db}){
+  const[emails,setEmails]=useState([]);
+  const[input,setInput]=useState('');
+  const[loading,setLoading]=useState(true);
+  const[toast,toastEl]=useToast();
 
-  useEffect(() => {
-    (async () => {
-      try {
+  useEffect(()=>{
+    (async()=>{
+      try{
         setLoading(true);
-        const data = await db.query('briefings', { order: 'id.desc', limit: 30 });
-        setItems(data);
-      } catch(e) { setToast({ msg: e.message, type: 'error' }); }
-      finally { setLoading(false); }
+        const s=await db.getSettings();
+        // value가 어떤 형태든 배열로 변환
+        const v=s['briefing_emails'];
+        if(!v){setEmails([]);return;}
+        // 이미 문자열이면 split, 배열이면 그대로
+        const arr=Array.isArray(v)?v.map(String):String(v).split(',').map(x=>x.trim()).filter(Boolean);
+        setEmails(arr);
+      }catch(e){toast(e.message,'err');}
+      finally{setLoading(false);}
     })();
-  }, [db]);
+  },[db]);
 
-  const fmt = (ts) => {
-    if (!ts) return '날짜 없음';
-    const d = new Date(ts);
-    if (isNaN(d)) return String(ts);
-    return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const persist=async(list)=>{
+    // 항상 쉼표구분 문자열로 저장
+    await db.setSetting('briefing_emails',list.join(','));
+    setEmails(list);
+  };
+  const add=async()=>{
+    const e=input.trim();
+    if(!e||!e.includes('@')){toast('올바른 이메일을 입력하세요','err');return;}
+    if(emails.includes(e)){toast('이미 등록된 이메일입니다','err');return;}
+    try{await persist([...emails,e]);setInput('');toast('추가되었습니다');}
+    catch(err){toast(err.message,'err');}
+  };
+  const remove=async(e)=>{
+    if(!confirm(`${e}을 삭제하시겠습니까?`))return;
+    try{await persist(emails.filter(x=>x!==e));toast('삭제되었습니다');}
+    catch(err){toast(err.message,'err');}
   };
 
-  if (loading) return h('div', { class: 'card' }, h('div', { class: 'empty' }, h('div', { class: 'spinner' })));
-
-  return h(Fragment, null,
-    toast && h(Toast, { msg: toast.msg, type: toast.type, onClose: () => setToast(null) }),
-    h('div', { class: 'card' },
-      h('div', { class: 'card-title' }, `발송 히스토리 (최근 ${items.length}건)`),
-      items.length === 0
-        ? h('div', { class: 'empty' }, STRINGS.emptyHistory)
-        : items.map(item => h('div', { class: 'history-item', key: item.id },
-            h('div', { class: 'history-header', onClick: () => setOpen(open === item.id ? null : item.id) },
-              h('span', { style: { fontSize: 13, fontWeight: 600 } }, `브리핑 #${item.id}`),
-              h('span', { class: 'history-date' }, fmt(item.created_at || item.inserted_at || item.timestamp || null))
-            ),
-            open === item.id && h('div', { class: 'history-body' }, item.content || '(내용 없음)')
-          ))
-    )
-  );
-}
-
-// ─── Key Setup Screen ─────────────────────────────────────────────
-function KeySetup({ onSave }) {
-  const [val, setVal] = useState('');
-  const save = () => { if (val.startsWith('eyJ')) { localStorage.setItem(ANON_KEY_STORAGE, val.trim()); onSave(val.trim()); } };
-  return h('div', { class: 'key-setup' },
-    h('div', { class: 'key-box' },
-      h('h1', null, STRINGS.keySetup.title),
-      h('p', null, STRINGS.keySetup.sub),
-      h('input', { placeholder: STRINGS.keySetup.placeholder, value: val, onInput: e => setVal(e.target.value), onKeyDown: e => e.key === 'Enter' && save() }),
-      h('button', { class: 'btn btn-primary', style: { width: '100%', justifyContent: 'center' }, onClick: save }, STRINGS.keySetup.btn)
-    )
-  );
-}
-
-// ─── App ─────────────────────────────────────────────────────────
-function App() {
-  const [anonKey, setAnonKey] = useState(() => localStorage.getItem(ANON_KEY_STORAGE) || '');
-  const [tab, setTab] = useState(0);
-  const db = anonKey ? createClient(anonKey) : null;
-
-  if (!anonKey) return h(KeySetup, { onSave: setAnonKey });
-
-  return h('div', { id: 'app' },
-    h('div', { class: 'header' },
-      h('div', { class: 'header-left' },
-        h('div', { class: 'status-dot' }),
-        h('div', { class: 'logo' }, STRINGS.appTitle, h('span', null, STRINGS.appSub))
+  return h(Fragment,null,
+    toastEl,
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},'수신자 관리'),
+      h('div',{style:'display:flex;gap:8px;margin-bottom:14px'},
+        h('input',{placeholder:'email@example.com',value:input,
+          onInput:e=>setInput(e.target.value),
+          onKeyDown:e=>e.key==='Enter'&&add(),
+          style:'flex:1'}),
+        h('button',{class:'btn btn-p',onClick:add},'추가')
       ),
-      h('button', {
-        class: 'btn btn-secondary btn-sm',
-        onClick: () => { if (confirm('연결을 초기화하시겠습니까?')) { localStorage.removeItem(ANON_KEY_STORAGE); setAnonKey(''); } }
-      }, '키 초기화')
-    ),
-    h('div', { class: 'tabs' },
-      STRINGS.tabs.map((t, i) => h('button', { class: `tab ${tab === i ? 'active' : ''}`, key: i, onClick: () => setTab(i) }, t))
-    ),
-    tab === 0 && h(TabInterests, { db }),
-    tab === 1 && h(TabEmails, { db }),
-    tab === 2 && h(TabSettings, { db }),
-    tab === 3 && h(TabHistory, { db }),
+      loading?h('div',{class:'empty'},h('span',{class:'spin spin-dark'})):
+      emails.length===0?h('div',{class:'empty'},'등록된 수신자가 없습니다'):
+      h('div',{class:'elist'},emails.map(e=>
+        h('div',{class:'erow',key:e},
+          h('span',{class:'eaddr'},e),
+          h('button',{class:'btn btn-d btn-sm',onClick:()=>remove(e)},'삭제')
+        )
+      ))
+    )
   );
 }
 
-render(h(App, null), document.getElementById('root'));
+/* ── Tab: 발송 설정 ── */
+function TabSettings({db}){
+  // days DB: 숫자 배열 [1,2,3,4,5] (1=월)
+  const[hour,setHour]=useState(9);
+  const[days,setDays]=useState([1,2,3,4,5]);
+  const[paused,setPaused]=useState(false);
+  const[loading,setLoading]=useState(true);
+  const[sending,setSending]=useState(false);
+  const[toast,toastEl]=useToast();
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        setLoading(true);
+        const s=await db.getSettings();
+        if(s.briefing_hour!=null)setHour(toNum(s.briefing_hour,9));
+        if(s.briefing_days!=null){
+          // [1,2,3,4,5] 숫자 배열
+          const arr=toArray(s.briefing_days).map(Number).filter(n=>n>=1&&n<=7);
+          setDays(arr.length?arr:[1,2,3,4,5]);
+        }
+        if(s.briefing_paused!=null)setPaused(toBool(s.briefing_paused));
+      }catch(e){toast(e.message,'err');}
+      finally{setLoading(false);}
+    })();
+  },[db]);
+
+  const toggleDay=(n)=>setDays(d=>d.includes(n)?d.filter(x=>x!==n):[...d,n].sort((a,b)=>a-b));
+
+  const saveAll=async()=>{
+    try{
+      await db.setSetting('briefing_hour',String(hour));
+      // 숫자 배열로 저장 (DB 원래 형식 유지)
+      await db.setSetting('briefing_days',days);
+      await db.setSetting('briefing_paused',paused);
+      toast('설정이 저장되었습니다');
+    }catch(e){toast(e.message,'err');}
+  };
+
+  const sendNow=async()=>{
+    setSending(true);
+    try{await db.invoke('daily-briefing');toast('브리핑을 발송했습니다');}
+    catch(e){toast(e.message,'err');}
+    finally{setSending(false);}
+  };
+
+  const togglePause=async()=>{
+    const next=!paused;
+    try{
+      await db.setSetting('briefing_paused',next);
+      setPaused(next);
+      toast(next?'브리핑을 일시정지했습니다':'브리핑을 재개했습니다');
+    }catch(e){toast(e.message,'err');}
+  };
+
+  if(loading)return h('div',{class:'card'},h('div',{class:'empty'},h('span',{class:'spin spin-dark'})));
+
+  return h(Fragment,null,
+    toastEl,
+    paused&&h('div',{class:'pause-bar'},
+      h('span',null,'⏸ 브리핑 일시정지 중'),
+      h('button',{class:'btn btn-s btn-sm',onClick:togglePause},'재개')
+    ),
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},'발송 시간'),
+      h('div',{class:'grid2'},
+        h('div',{class:'field'},
+          h('label',null,'발송 시각 (0~23시)'),
+          h('input',{type:'number',min:0,max:23,value:hour,onInput:e=>setHour(toNum(e.target.value,9))})
+        ),
+        h('div',{class:'field'},
+          h('label',null,'현재 설정'),
+          h('div',{style:'padding:8px 0;color:var(--txt2);font-size:13px'},`매일 ${hour}:00`)
+        )
+      )
+    ),
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},'발송 요일'),
+      h('div',{class:'days'},
+        DAY_NUMS.map((n,i)=>
+          h('button',{class:`day${days.includes(n)?' on':''}`,onClick:()=>toggleDay(n)},DAYS_KR[i])
+        )
+      )
+    ),
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},'제어'),
+      h('div',{style:'display:flex;gap:10px;flex-wrap:wrap'},
+        h('button',{class:'btn btn-p',onClick:saveAll},'💾 설정 저장'),
+        h('button',{class:'btn btn-s',disabled:sending,onClick:sendNow},
+          sending?h('span',{class:'spin'}):null,' 즉시 발송'
+        ),
+        h('button',{class:'btn btn-s',onClick:togglePause},paused?'▶ 재개':'⏸ 일시정지')
+      )
+    )
+  );
+}
+
+/* ── Tab: 히스토리 ── */
+function TabHistory({db}){
+  const[items,setItems]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[open,setOpen]=useState(null);
+  const[toast,toastEl]=useToast();
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        setLoading(true);
+        const rows=await db.getBriefings();
+        setItems(rows);
+      }catch(e){toast(e.message,'err');}
+      finally{setLoading(false);}
+    })();
+  },[db]);
+
+  // briefings 테이블 컬럼명 불확실 → 있는 날짜 컬럼 자동 탐색
+  const getDate=(item)=>{
+    const candidates=['created_at','inserted_at','timestamp','sent_at','date','updated_at'];
+    for(const k of candidates){if(item[k])return fmtDate(item[k]);}
+    return '';
+  };
+  const getContent=(item)=>{
+    const candidates=['content','body','text','message','result'];
+    for(const k of candidates){if(item[k])return item[k];}
+    return JSON.stringify(item,null,2);
+  };
+
+  if(loading)return h('div',{class:'card'},h('div',{class:'empty'},h('span',{class:'spin spin-dark'})));
+
+  return h(Fragment,null,
+    toastEl,
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},`발송 히스토리 (최근 ${items.length}건)`),
+      items.length===0?h('div',{class:'empty'},'브리핑 히스토리가 없습니다'):
+      items.map(item=>h('div',{class:'hist-item',key:item.id},
+        h('div',{class:'hist-hdr',onClick:()=>setOpen(open===item.id?null:item.id)},
+          h('span',{style:'font-size:13px;font-weight:600'},`브리핑 #${item.id}`),
+          h('span',{style:'font-size:12px;color:var(--txt3)'},getDate(item))
+        ),
+        open===item.id&&h('div',{class:'hist-body'},getContent(item))
+      ))
+    )
+  );
+}
+
+/* ── Key Setup ── */
+function KeySetup({onSave}){
+  const[v,setV]=useState('');
+  const go=()=>{if(v.startsWith('eyJ')){localStorage.setItem(KEY_LS,v.trim());onSave(v.trim());}};
+  return h('div',{class:'key-wrap'},
+    h('div',{class:'key-box'},
+      h('h1',null,'깡자동 브리핑'),
+      h('p',null,'Supabase Anon Key를 입력하여 시작하세요'),
+      h('input',{placeholder:'eyJhbGci...',value:v,onInput:e=>setV(e.target.value),onKeyDown:e=>e.key==='Enter'&&go()}),
+      h('button',{class:'btn btn-p',style:'width:100%',onClick:go},'연결하기')
+    )
+  );
+}
+
+/* ── App ── */
+function App(){
+  const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||'');
+  const[tab,setTab]=useState(0);
+  const db=key?mkDB(key):null;
+  const TABS=['관심사','수신자','발송 설정','히스토리'];
+
+  if(!key)return h(KeySetup,{onSave:setKey});
+
+  return h(Fragment,null,
+    h('div',{class:'hdr'},
+      h('div',{style:'display:flex;align-items:center'},
+        h('span',{class:'dot'}),
+        h('div',{class:'logo'},'깡자동 브리핑',h('small',null,'설정 관리'))
+      ),
+      h('button',{class:'btn btn-s btn-sm',onClick:()=>{
+        if(confirm('연결을 초기화하시겠습니까?')){localStorage.removeItem(KEY_LS);setKey('');}
+      }},'키 초기화')
+    ),
+    h('div',{class:'tabs'},TABS.map((t,i)=>
+      h('button',{class:`tab${tab===i?' on':''}`,onClick:()=>setTab(i)},t)
+    )),
+    tab===0&&h(TabInterests,{db}),
+    tab===1&&h(TabEmails,{db}),
+    tab===2&&h(TabSettings,{db}),
+    tab===3&&h(TabHistory,{db}),
+  );
+}
+
+render(h(App,null),document.getElementById('root'));
 </script>
 </body>
 </html>
