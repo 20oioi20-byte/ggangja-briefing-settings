@@ -108,7 +108,6 @@ import{useState,useEffect,useCallback,useRef}from'https://esm.sh/preact@10.19.3/
 /* ── 상수 ── */
 const SUPA_URL='https://zbiwyqwjehnogxkzlhxx.supabase.co';
 const KEY_LS='ggangja_anon_key';
-const HARDCODED_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiaXd5cXdqZWhub2d4a3psaHh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwOTQ1MzYsImV4cCI6MjA5NjY3MDUzNn0.SQJjHnDcMTRyElxtY9E-04yIkzPVF35L8hcx0lSyG48';
 const DAYS_KR=['월','화','수','목','금','토','일'];
 // DB에 숫자 배열 [1,2,3,4,5] 로 저장됨 (1=월 ~ 7=일)
 const DAY_NUMS=[1,2,3,4,5,6,7];
@@ -199,6 +198,50 @@ function mkDB(key){
       const txt=await res.text();
       if(!res.ok)throw new Error(txt||res.statusText);
       return txt?JSON.parse(txt):{};
+    },
+    async getChannels(){
+      return req('/youtube_channels?order=sort_order.asc,created_at.asc');
+    },
+    async addChannel(d){
+      return req('/youtube_channels',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+    },
+    async updateChannel(id,d){
+      return req(`/youtube_channels?id=eq.${id}`,{method:'PATCH',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+    },
+    async deleteChannel(id){
+      return req(`/youtube_channels?id=eq.${id}`,{method:'DELETE'});
+    },
+    async resolveYoutubeChannel(input){
+      // @핸들 / youtube.com/@핸들 / youtube.com/channel/UC... / 채널ID 모두 지원
+      const ytKey='AIzaSyChds7cxLVrO0vVOqcB0IEgQeJ5UkdnJeU';
+      const s=input.trim();
+      let url='';
+      let handle='';
+      const chMatch=s.match(/channel\/(UC[\w-]+)/);
+      const idMatch=s.match(/^(UC[\w-]+)$/);
+      const atMatch=s.match(/@([\w가-힣._-]+)/);
+      if(chMatch){
+        url=`https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&id=${chMatch[1]}&key=${ytKey}`;
+      }else if(idMatch){
+        url=`https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&id=${idMatch[1]}&key=${ytKey}`;
+      }else if(atMatch){
+        handle=atMatch[1];
+        url=`https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&forHandle=@${handle}&key=${ytKey}`;
+      }else{
+        handle=s.replace(/^@/,'');
+        url=`https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&forHandle=@${handle}&key=${ytKey}`;
+      }
+      const res=await fetch(url);
+      const data=await res.json();
+      if(data.error)throw new Error(data.error.message);
+      const item=(data.items||[])[0];
+      if(!item)throw new Error('채널을 찾을 수 없습니다. 핸들(@채널명) 또는 채널 URL을 확인하세요.');
+      return {
+        channel_id:item.id,
+        channel_title:item.snippet.title,
+        uploads_playlist_id:item.contentDetails.relatedPlaylists.uploads,
+        handle:handle?'@'+handle:(item.snippet.customUrl||'')
+      };
     }
   };
 }
@@ -544,6 +587,106 @@ function TabHistory({db}){
   );
 }
 
+/* ── Tab: 유튜브 ── */
+function TabYoutube({db}){
+  const[channels,setChannels]=useState([]);
+  const[input,setInput]=useState('');
+  const[loading,setLoading]=useState(true);
+  const[adding,setAdding]=useState(false);
+  const[toast,toastEl]=useToast();
+
+  const load=useCallback(async()=>{
+    try{setLoading(true);setChannels(await db.getChannels());}
+    catch(e){toast(e.message,'err');}
+    finally{setLoading(false);}
+  },[db]);
+  useEffect(()=>{load();},[load]);
+
+  const add=async()=>{
+    const s=input.trim();
+    if(!s){toast('채널 핸들(@채널명) 또는 URL을 입력하세요','err');return;}
+    setAdding(true);
+    try{
+      // 1) YouTube에서 채널 정보 조회
+      const info=await db.resolveYoutubeChannel(s);
+      // 2) 중복 확인
+      if(channels.some(c=>c.channel_id===info.channel_id)){
+        toast('이미 등록된 채널입니다','err');setAdding(false);return;
+      }
+      // 3) 저장
+      await db.addChannel({
+        handle:info.handle,
+        channel_id:info.channel_id,
+        channel_title:info.channel_title,
+        uploads_playlist_id:info.uploads_playlist_id,
+        is_active:true,
+        sort_order:channels.length
+      });
+      setInput('');
+      toast(`'${info.channel_title}' 채널이 추가되었습니다`);
+      load();
+    }catch(e){toast(e.message,'err');}
+    finally{setAdding(false);}
+  };
+
+  const toggle=async(ch)=>{
+    try{
+      await db.updateChannel(ch.id,{is_active:!ch.is_active});
+      setChannels(cs=>cs.map(c=>c.id===ch.id?{...c,is_active:!c.is_active}:c));
+    }catch(e){toast(e.message,'err');}
+  };
+
+  const remove=async(ch)=>{
+    if(!confirm(`'${ch.channel_title}' 채널을 삭제하시겠습니까?`))return;
+    try{
+      await db.deleteChannel(ch.id);
+      setChannels(cs=>cs.filter(c=>c.id!==ch.id));
+      toast('삭제되었습니다');
+    }catch(e){toast(e.message,'err');}
+  };
+
+  return h(Fragment,null,
+    toastEl,
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},'유튜브 채널 추가'),
+      h('div',{style:'display:flex;gap:8px;margin-bottom:8px'},
+        h('input',{placeholder:'@채널명 또는 youtube.com/@채널명',value:input,
+          onInput:e=>setInput(e.target.value),
+          onKeyDown:e=>e.key==='Enter'&&!adding&&add(),
+          style:'flex:1'}),
+        h('button',{class:'btn btn-p',onClick:add,disabled:adding},
+          adding?h('span',{class:'spin'}):null,' 추가')
+      ),
+      h('div',{style:'font-size:11px;color:var(--txt3);line-height:1.6'},
+        '예시: @syukaworld, @3protv, 또는 채널 URL 붙여넣기')
+    ),
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},`등록된 채널 (${channels.length}개)`),
+      loading?h('div',{class:'empty'},h('span',{class:'spin spin-dark'})):
+      channels.length===0?h('div',{class:'empty'},'등록된 채널이 없습니다'):
+      h('div',{class:'ilist'},channels.map(ch=>
+        h('div',{class:`irow${ch.is_active?'':' off'}`,key:ch.id},
+          h('button',{class:`tgl${ch.is_active?' on':''}`,onClick:()=>toggle(ch)}),
+          h('div',null,
+            h('div',{class:'ilabel'},ch.channel_title),
+            h('div',{class:'imeta'},ch.handle||ch.channel_id)
+          ),
+          h('span',{class:'badge'},'📺'),
+          h('div',{class:'iact'},
+            h('button',{class:'btn btn-d btn-sm',onClick:()=>remove(ch)},'🗑️')
+          )
+        )
+      ))
+    ),
+    h('div',{class:'card'},
+      h('div',{style:'font-size:12px;color:var(--txt2);line-height:1.8'},
+        '💡 매일 발송 시간에 등록된 채널의 ',
+        h('strong',null,'최근 24시간 신규 영상'),
+        '을 AI가 분석해 영상별로 메일·카톡으로 보냅니다. (뉴스 브리핑과 별도)')
+    )
+  );
+}
+
 /* ── Key Setup ── */
 function KeySetup({onSave}){
   const[v,setV]=useState('');
@@ -560,10 +703,10 @@ function KeySetup({onSave}){
 
 /* ── App ── */
 function App(){
-  const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||HARDCODED_KEY);
+  const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||'');
   const[tab,setTab]=useState(0);
   const db=key?mkDB(key):null;
-  const TABS=['관심사','수신자','발송 설정','히스토리'];
+  const TABS=['관심사','수신자','발송 설정','히스토리','유튜브'];
 
   if(!key)return h(KeySetup,{onSave:setKey});
 
@@ -584,6 +727,7 @@ function App(){
     tab===1&&h(TabEmails,{db}),
     tab===2&&h(TabSettings,{db}),
     tab===3&&h(TabHistory,{db}),
+    tab===4&&h(TabYoutube,{db}),
   );
 }
 
