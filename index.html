@@ -593,7 +593,24 @@ function TabYoutube({db}){
   const[input,setInput]=useState('');
   const[loading,setLoading]=useState(true);
   const[adding,setAdding]=useState(false);
+  const[sending,setSending]=useState(false);
   const[toast,toastEl]=useToast();
+
+  const sendNow=async()=>{
+    setSending(true);
+    try{
+      const key=localStorage.getItem('ggangja_anon_key')||'';
+      const res=await fetch(`${SUPA_URL}/functions/v1/youtube-briefing?force=true`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'}
+      });
+      const data=await res.json();
+      if(data.error)throw new Error(data.error);
+      if(data.videosSent===0)toast('신규 영상이 없습니다 (24시간 내)','info');
+      else toast(`${data.videosSent}개 영상 브리핑을 발송했습니다`);
+    }catch(e){toast(e.message,'err');}
+    finally{setSending(false);}
+  };
 
   const load=useCallback(async()=>{
     try{setLoading(true);setChannels(await db.getChannels());}
@@ -679,10 +696,14 @@ function TabYoutube({db}){
       ))
     ),
     h('div',{class:'card'},
-      h('div',{style:'font-size:12px;color:var(--txt2);line-height:1.8'},
-        '💡 매일 발송 시간에 등록된 채널의 ',
-        h('strong',null,'최근 24시간 신규 영상'),
-        '을 AI가 분석해 영상별로 메일·카톡으로 보냅니다. (뉴스 브리핑과 별도)')
+      h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'},
+        h('div',{style:'font-size:12px;color:var(--txt2);line-height:1.8'},
+          '💡 매일 발송 시간에 등록된 채널의 ',
+          h('strong',null,'최근 24시간 신규 영상'),
+          '을 AI가 분석해 영상별로 메일·카톡으로 보냅니다. (뉴스 브리핑과 별도)')
+      ),
+      h('button',{class:'btn btn-s',disabled:sending,onClick:sendNow},
+        sending?h('span',{class:'spin'}):null,' 유튜브 즉시발송')
     )
   );
 }
