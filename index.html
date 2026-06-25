@@ -242,6 +242,37 @@ function mkDB(key){
         uploads_playlist_id:item.contentDetails.relatedPlaylists.uploads,
         handle:handle?'@'+handle:(item.snippet.customUrl||'')
       };
+    },
+    async getMembers(){
+      return req('/saju_members?order=sort_order.asc,created_at.asc');
+    },
+    async addMember(d){
+      return req('/saju_members',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+    },
+    async updateMember(id,d){
+      return req(`/saju_members?id=eq.${id}`,{method:'PATCH',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+    },
+    async deleteMember(id){
+      return req(`/saju_members?id=eq.${id}`,{method:'DELETE'});
+    },
+    async invokeSaju(){
+      const res=await fetch(`${SUPA_URL}/functions/v1/saju-briefing?force=true`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'}
+      });
+      const txt=await res.text();
+      if(!res.ok)throw new Error(txt||res.statusText);
+      return txt?JSON.parse(txt):{};
+    },
+    async invokeAnnual(memberIds){
+      const res=await fetch(`${SUPA_URL}/functions/v1/saju-annual`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({memberIds})
+      });
+      const txt=await res.text();
+      if(!res.ok)throw new Error(txt||res.statusText);
+      return txt?JSON.parse(txt):{};
     }
   };
 }
@@ -708,6 +739,182 @@ function TabYoutube({db}){
   );
 }
 
+/* ── Tab: 사주 ── */
+function TabSaju({db}){
+  const[members,setMembers]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[showForm,setShowForm]=useState(false);
+  const[editTarget,setEditTarget]=useState(null);
+  const[sending,setSending]=useState(false);
+  const[annualChecked,setAnnualChecked]=useState({});
+  const[annualSending,setAnnualSending]=useState(false);
+  const[form,setForm]=useState({name:'',name_hanja:'',gender:'',relationship:'',birth_solar_date:'',birth_solar_time:'',birth_lunar_date:'',birth_lunar_time:'',birthplace:'',current_location:'',occupation:'',notes:''});
+  const[toast,toastEl]=useToast();
+
+  const load=useCallback(async()=>{
+    try{setLoading(true);const data=await db.getMembers();setMembers(data);}
+    catch(e){toast(e.message,'err');}
+    finally{setLoading(false);}
+  },[db]);
+  useEffect(()=>{load();},[load]);
+
+  const resetForm=()=>setForm({name:'',name_hanja:'',gender:'',relationship:'',birth_solar_date:'',birth_solar_time:'',birth_lunar_date:'',birth_lunar_time:'',birthplace:'',current_location:'',occupation:'',notes:''});
+
+  const openAdd=()=>{resetForm();setEditTarget(null);setShowForm(true);};
+  const openEdit=(m)=>{setForm({name:m.name||'',name_hanja:m.name_hanja||'',gender:m.gender||'',relationship:m.relationship||'',birth_solar_date:m.birth_solar_date||'',birth_solar_time:m.birth_solar_time||'',birth_lunar_date:m.birth_lunar_date||'',birth_lunar_time:m.birth_lunar_time||'',birthplace:m.birthplace||'',current_location:m.current_location||'',occupation:m.occupation||'',notes:m.notes||''});setEditTarget(m);setShowForm(true);};
+
+  const save=async()=>{
+    if(!form.name.trim()){toast('이름은 필수입니다','err');return;}
+    try{
+      const d={...form,sort_order:editTarget?editTarget.sort_order:members.length};
+      if(editTarget) await db.updateMember(editTarget.id,d);
+      else await db.addMember({...d,is_active:true});
+      toast(editTarget?'수정되었습니다':'추가되었습니다');
+      setShowForm(false);load();
+    }catch(e){toast(e.message,'err');}
+  };
+
+  const remove=async(m)=>{
+    if(!confirm(`'${m.name}' 구성원을 삭제하시겠습니까?`))return;
+    try{await db.deleteMember(m.id);setMembers(ms=>ms.filter(x=>x.id!==m.id));toast('삭제되었습니다');}
+    catch(e){toast(e.message,'err');}
+  };
+
+  const toggle=async(m)=>{
+    try{await db.updateMember(m.id,{is_active:!m.is_active});setMembers(ms=>ms.map(x=>x.id===m.id?{...x,is_active:!x.is_active}:x));}
+    catch(e){toast(e.message,'err');}
+  };
+
+  const sendNow=async()=>{
+    setSending(true);
+    try{
+      const res=await db.invokeSaju();
+      if(res.error)throw new Error(res.error);
+      toast('사주 브리핑을 발송 중입니다. 잠시 후 메일·카톡을 확인하세요.');
+    }catch(e){toast(e.message,'err');}
+    finally{setSending(false);}
+  };
+
+  const sendAnnual=async()=>{
+    const ids=Object.entries(annualChecked).filter(([,v])=>v).map(([k])=>k);
+    if(ids.length===0){toast('구성원을 선택해주세요','err');return;}
+    setAnnualSending(true);
+    try{
+      const res=await db.invokeAnnual(ids);
+      if(res.error)throw new Error(res.error);
+      toast(`${ids.length}명 연간운세 분석 중입니다. 잠시 후 메일·카톡을 확인하세요.`);
+      setAnnualChecked({});
+    }catch(e){toast(e.message,'err');}
+    finally{setAnnualSending(false);}
+  };
+
+  const F=(label,key,type='text',placeholder='')=>h('div',{style:'margin-bottom:10px'},
+    h('label',{style:'font-size:12px;color:var(--txt2);display:block;margin-bottom:3px'},label),
+    h('input',{type,value:form[key],placeholder,style:'width:100%;box-sizing:border-box',
+      onInput:e=>setForm(f=>({...f,[key]:e.target.value}))})
+  );
+
+  if(showForm)return h(Fragment,null,
+    toastEl,
+    h('div',{class:'card'},
+      h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px'},
+        h('div',{class:'ctitle',style:'margin:0'},editTarget?'구성원 수정':'구성원 추가'),
+        h('button',{class:'btn btn-sm',onClick:()=>setShowForm(false)},'✕ 취소')
+      ),
+      F('이름 *','name','text','홍길동'),
+      F('한자 이름','name_hanja','text','洪吉童'),
+      h('div',{style:'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'},
+        h('div',null,
+          h('label',{style:'font-size:12px;color:var(--txt2);display:block;margin-bottom:3px'},'성별'),
+          h('select',{value:form.gender,style:'width:100%',onChange:e=>setForm(f=>({...f,gender:e.target.value}))},
+            h('option',{value:''},'선택'),
+            h('option',{value:'남'},'남'),
+            h('option',{value:'여'},'여')
+          )
+        ),
+        h('div',null,
+          h('label',{style:'font-size:12px;color:var(--txt2);display:block;margin-bottom:3px'},'관계'),
+          h('select',{value:form.relationship,style:'width:100%',onChange:e=>setForm(f=>({...f,relationship:e.target.value}))},
+            h('option',{value:''},'선택'),
+            h('option',{value:'본인'},'본인'),
+            h('option',{value:'배우자'},'배우자'),
+            h('option',{value:'자녀'},'자녀'),
+            h('option',{value:'부모'},'부모'),
+            h('option',{value:'기타'},'기타')
+          )
+        )
+      ),
+      h('div',{style:'font-size:12px;color:var(--txt3);margin-bottom:6px;font-weight:600'},'양력 생년월일/시'),
+      h('div',{style:'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'},
+        h('input',{type:'date',value:form.birth_solar_date,onInput:e=>setForm(f=>({...f,birth_solar_date:e.target.value}))}),
+        h('input',{type:'time',value:form.birth_solar_time,placeholder:'태어난 시간',onInput:e=>setForm(f=>({...f,birth_solar_time:e.target.value}))})
+      ),
+      h('div',{style:'font-size:12px;color:var(--txt3);margin-bottom:6px;font-weight:600'},'음력 생년월일/시'),
+      h('div',{style:'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'},
+        h('input',{type:'text',placeholder:'예: 1987-01-01',value:form.birth_lunar_date,onInput:e=>setForm(f=>({...f,birth_lunar_date:e.target.value}))}),
+        h('input',{type:'time',value:form.birth_lunar_time,placeholder:'태어난 시간',onInput:e=>setForm(f=>({...f,birth_lunar_time:e.target.value}))})
+      ),
+      F('태어난 곳','birthplace','text','서울특별시'),
+      F('현재 사는 곳','current_location','text','서울특별시'),
+      F('현재 하는 일','occupation','text','예: 회사원, PM 등'),
+      h('div',{style:'margin-bottom:10px'},
+        h('label',{style:'font-size:12px;color:var(--txt2);display:block;margin-bottom:3px'},'기타 메모'),
+        h('textarea',{value:form.notes,placeholder:'추가 정보 (선택사항)',rows:2,style:'width:100%;box-sizing:border-box;resize:vertical',onInput:e=>setForm(f=>({...f,notes:e.target.value}))})
+      ),
+      h('button',{class:'btn btn-p',style:'width:100%',onClick:save},editTarget?'수정 저장':'추가 저장')
+    )
+  );
+
+  return h(Fragment,null,
+    toastEl,
+    h('div',{class:'card'},
+      h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'},
+        h('div',{class:'ctitle',style:'margin:0'},`사주 구성원 (${members.length}명)`),
+        h('button',{class:'btn btn-p btn-sm',onClick:openAdd},'+ 추가')
+      ),
+      loading?h('div',{class:'empty'},h('span',{class:'spin spin-dark'})):
+      members.length===0?h('div',{class:'empty'},'등록된 구성원이 없습니다'):
+      h('div',{class:'ilist'},members.map(m=>
+        h('div',{class:`irow${m.is_active?'':' off'}`,key:m.id},
+          h('button',{class:`tgl${m.is_active?' on':''}`,onClick:()=>toggle(m)}),
+          h('div',null,
+            h('div',{class:'ilabel'},m.name+(m.name_hanja?` (${m.name_hanja})`:'')+(m.relationship?` · ${m.relationship}`:'')),
+            h('div',{class:'imeta'},[m.birth_solar_date,m.gender,m.occupation].filter(Boolean).join(' · '))
+          ),
+          h('span',{class:'badge'},'🔮'),
+          h('div',{class:'iact'},
+            h('button',{class:'btn btn-s btn-sm',onClick:()=>openEdit(m)},'✏️'),
+            h('button',{class:'btn btn-d btn-sm',onClick:()=>remove(m)},'🗑️')
+          )
+        )
+      ))
+    ),
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},'사주 즉시발송'),
+      h('div',{style:'font-size:12px;color:var(--txt2);margin-bottom:10px;line-height:1.7'},
+        '활성화된 구성원 전체의 오늘 일일운세를 통합 1통으로 발송합니다.'),
+      h('button',{class:'btn btn-p',disabled:sending,onClick:sendNow},
+        sending?h('span',{class:'spin'}):null,' 🔮 사주 즉시발송')
+    ),
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},'연간운세 (토종비결) 발송'),
+      h('div',{style:'font-size:12px;color:var(--txt2);margin-bottom:10px;line-height:1.7'},
+        '받을 구성원을 선택하면 각각 개별 발송됩니다.'),
+      members.length===0?h('div',{class:'empty'},'등록된 구성원이 없습니다'):
+      h('div',{style:'margin-bottom:12px'},
+        members.map(m=>h('label',{key:m.id,style:'display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer'},
+          h('input',{type:'checkbox',checked:!!annualChecked[m.id],
+            onChange:e=>setAnnualChecked(c=>({...c,[m.id]:e.target.checked}))}),
+          h('span',{style:'font-size:14px'},m.name+(m.relationship?` (${m.relationship})`:'')),
+          !m.is_active&&h('span',{style:'font-size:11px;color:var(--txt3)'},' 비활성')
+        ))
+      ),
+      h('button',{class:'btn btn-s',disabled:annualSending,onClick:sendAnnual},
+        annualSending?h('span',{class:'spin'}):null,' 📜 연간운세 발송')
+    )
+  );
+}
+
 /* ── Key Setup ── */
 function KeySetup({onSave}){
   const[v,setV]=useState('');
@@ -727,7 +934,7 @@ function App(){
   const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||'');
   const[tab,setTab]=useState(0);
   const db=key?mkDB(key):null;
-  const TABS=['관심사','수신자','발송 설정','히스토리','유튜브'];
+  const TABS=['관심사','수신자','발송 설정','히스토리','유튜브','사주'];
 
   if(!key)return h(KeySetup,{onSave:setKey});
 
@@ -749,6 +956,7 @@ function App(){
     tab===2&&h(TabSettings,{db}),
     tab===3&&h(TabHistory,{db}),
     tab===4&&h(TabYoutube,{db}),
+    tab===5&&h(TabSaju,{db}),
   );
 }
 
