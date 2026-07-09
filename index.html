@@ -317,6 +317,24 @@ function mkDB(key){
       const fileUrl=`${SUPA_URL}/storage/v1/object/public/kakao-files/${fname}`;
       // 링크로 카톡 발송
       return this.kakaoSendLink(file.name,fileUrl,`파일 크기: ${(file.size/1024).toFixed(1)}KB`);
+    },
+    async listFiles(){
+      const res=await fetch(`${SUPA_URL}/storage/v1/object/list/kakao-files`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({prefix:'',limit:200,offset:0,sortBy:{column:'created_at',order:'desc'}})
+      });
+      if(!res.ok)throw new Error(await res.text());
+      return await res.json();
+    },
+    async deleteFile(name){
+      const res=await fetch(`${SUPA_URL}/storage/v1/object/kakao-files`,{
+        method:'DELETE',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({prefixes:[name]})
+      });
+      if(!res.ok)throw new Error(await res.text());
+      return await res.json();
     }
   };
 }
@@ -976,10 +994,12 @@ function TabKakao({db}){
   const[linkUrl,setLinkUrl]=useState('');
   const[linkDesc,setLinkDesc]=useState('');
   const[linkSending,setLinkSending]=useState(false);
-  // 파일
-  const[file,setFile]=useState(null);
+  // 파일 (드래그 & 멀티)
+  const[files,setFiles]=useState([]);
   const[fileSending,setFileSending]=useState(false);
+  const[dragOver,setDragOver]=useState(false);
   const fileRef=useRef(null);
+  const addFiles=(newFiles)=>setFiles(f=>[...f,...Array.from(newFiles)]);
 
   const sendText=async()=>{
     if(!text.trim()){toast('내용을 입력하세요','err');return;}
@@ -1005,10 +1025,15 @@ function TabKakao({db}){
     finally{setLinkSending(false);}
   };
 
-  const sendFile=async()=>{
-    if(!file){toast('파일을 선택하세요','err');return;}
+  const sendFiles=async()=>{
+    if(files.length===0){toast('파일을 선택하세요','err');return;}
     setFileSending(true);
-    try{await db.kakaoSendFile(file);toast('파일 링크 전송 완료!');setFile(null);if(fileRef.current)fileRef.current.value='';}
+    try{
+      for(const f of files) await db.kakaoSendFile(f);
+      toast(`${files.length}개 파일 전송 완료!`);
+      setFiles([]);
+      if(fileRef.current)fileRef.current.value='';
+    }
     catch(e){toast(e.message,'err');}
     finally{setFileSending(false);}
   };
@@ -1060,25 +1085,100 @@ function TabKakao({db}){
       ),
 
       tab===3&&h(Fragment,null,
-        h('div',{style:'background:#f8f9fa;border:2px dashed var(--bdr);border-radius:8px;padding:20px;text-align:center;margin-bottom:10px',
+        h('div',{
+          style:`cursor:pointer;background:${dragOver?'#ede8ff':'#f8f9fa'};border:2px dashed ${dragOver?'var(--p)':'var(--bdr)'};border-radius:8px;padding:24px;text-align:center;margin-bottom:10px;transition:all .2s`,
           onClick:()=>fileRef.current&&fileRef.current.click(),
-          style:'cursor:pointer;background:#f8f9fa;border:2px dashed var(--bdr);border-radius:8px;padding:20px;text-align:center;margin-bottom:10px'},
-          h('input',{type:'file',ref:fileRef,style:'display:none',
-            onChange:e=>setFile(e.target.files[0]||null)}),
-          file
-            ? h(Fragment,null,
-                h('div',{style:'font-size:14px;font-weight:600;color:var(--p)'},file.name),
-                h('div',{style:'font-size:12px;color:var(--txt3);margin-top:4px'},`${(file.size/1024).toFixed(1)}KB`))
-            : h(Fragment,null,
-                h('div',{style:'font-size:24px;margin-bottom:6px'},'📎'),
-                h('div',{style:'font-size:13px;color:var(--txt2)'},'클릭해서 파일 선택'))
+          onDragOver:e=>{e.preventDefault();setDragOver(true);},
+          onDragLeave:()=>setDragOver(false),
+          onDrop:e=>{e.preventDefault();setDragOver(false);addFiles(e.dataTransfer.files);}
+        },
+          h('input',{type:'file',ref:fileRef,style:'display:none',multiple:true,
+            onChange:e=>addFiles(e.target.files)}),
+          h('div',{style:'font-size:28px;margin-bottom:6px'},'📎'),
+          h('div',{style:'font-size:13px;color:var(--txt2);line-height:1.6'},
+            dragOver?'여기에 놓으세요!':'클릭 또는 드래그로 파일 선택',h('br'),
+            h('span',{style:'font-size:11px;color:var(--txt3)'},'여러 개 동시 선택 가능'))
+        ),
+        files.length>0&&h('div',{style:'margin-bottom:10px'},
+          files.map((f,i)=>h('div',{key:i,style:'display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#f0f2ff;border-radius:6px;margin-bottom:4px'},
+            h('span',{style:'font-size:12px;color:var(--txt);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},
+              `${f.name} (${(f.size/1024).toFixed(1)}KB)`),
+            h('button',{class:'btn btn-d btn-sm',style:'margin-left:6px;flex-shrink:0',
+              onClick:()=>setFiles(fs=>fs.filter((_,j)=>j!==i))},'✕')
+          ))
         ),
         h('div',{style:'font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.6'},
-          '※ 파일은 Supabase Storage에 업로드 후 다운로드 링크로 발송됩니다.',h('br'),
-          '※ SQL Editor에서 kakao-files 버킷 생성 필요 (아직 안 하셨으면 먼저 실행하세요)'),
-        h('button',{class:'btn btn-p',style:'width:100%',disabled:fileSending||!file,onClick:sendFile},
-          fileSending?h('span',{class:'spin'}):null,' 📎 파일 업로드 후 전송')
+          '※ 파일은 Supabase Storage에 업로드 후 다운로드 링크로 발송됩니다.'),
+        h('button',{class:'btn btn-p',style:'width:100%',disabled:fileSending||files.length===0,onClick:sendFiles},
+          fileSending?h('span',{class:'spin'}):null,
+          files.length>0?` 📎 ${files.length}개 파일 전송`:' 📎 파일 전송')
       )
+    )
+  );
+}
+
+/* ── Tab: 파일함 ── */
+function TabFiles({db}){
+  const[files,setFiles]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[search,setSearch]=useState('');
+  const[toast,toastEl]=useToast();
+
+  const load=useCallback(async()=>{
+    try{setLoading(true);const data=await db.listFiles();setFiles(Array.isArray(data)?data:[]);}
+    catch(e){toast(e.message,'err');}
+    finally{setLoading(false);}
+  },[db]);
+  useEffect(()=>{load();},[load]);
+
+  const del=async(name)=>{
+    if(!confirm(`'${name}' 파일을 삭제하시겠습니까?`))return;
+    try{await db.deleteFile(name);setFiles(fs=>fs.filter(f=>f.name!==name));toast('삭제됐습니다');}
+    catch(e){toast(e.message,'err');}
+  };
+
+  const filtered=files.filter(f=>(f.name||'').toLowerCase().includes(search.toLowerCase()));
+  const getFileUrl=(name)=>`${SUPA_URL}/storage/v1/object/public/kakao-files/${name}`;
+  const getIcon=(name)=>{
+    const ext=(name||'').split('.').pop().toLowerCase();
+    if(['jpg','jpeg','png','gif','webp'].includes(ext))return '🖼';
+    if(['pdf'].includes(ext))return '📄';
+    if(['xlsx','xls','csv'].includes(ext))return '📊';
+    if(['docx','doc'].includes(ext))return '📝';
+    if(['zip','rar','7z'].includes(ext))return '🗜';
+    if(['mp4','mov','avi'].includes(ext))return '🎬';
+    return '📎';
+  };
+
+  return h(Fragment,null,
+    toastEl,
+    h('div',{class:'card'},
+      h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'},
+        h('div',{class:'ctitle',style:'margin:0'},`파일함 (${filtered.length}개)`),
+        h('button',{class:'btn btn-sm',onClick:load},'🔄')
+      ),
+      h('input',{placeholder:'🔍 파일명 검색...',value:search,
+        onInput:e=>setSearch(e.target.value),
+        style:'width:100%;box-sizing:border-box;margin-bottom:12px'}),
+      loading?h('div',{class:'empty'},h('span',{class:'spin spin-dark'})):
+      filtered.length===0?h('div',{class:'empty'},search?'검색 결과가 없습니다':'업로드된 파일이 없습니다'):
+      h('div',null,filtered.map((f,i)=>{
+        const fileUrl=getFileUrl(f.name);
+        const sizeKB=f.metadata&&f.metadata.size?(f.metadata.size/1024).toFixed(1)+'KB':'';
+        const date=f.created_at?new Date(f.created_at).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+        return h('div',{key:f.name,style:`display:flex;align-items:center;padding:10px 4px;${i<filtered.length-1?'border-bottom:1px solid var(--bdr)':''}`},
+          h('span',{style:'font-size:20px;margin-right:10px;flex-shrink:0'},getIcon(f.name)),
+          h('div',{style:'flex:1;min-width:0'},
+            h('div',{style:'font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'},f.name),
+            h('div',{style:'font-size:11px;color:var(--txt3);margin-top:2px'},[sizeKB,date].filter(Boolean).join(' · '))
+          ),
+          h('div',{style:'display:flex;gap:5px;margin-left:8px;flex-shrink:0'},
+            h('a',{href:fileUrl,target:'_blank',download:f.name,
+              class:'btn btn-s btn-sm',title:'다운로드'},'⬇'),
+            h('button',{class:'btn btn-d btn-sm',title:'삭제',onClick:()=>del(f.name)},'🗑️')
+          )
+        );
+      }))
     )
   );
 }
@@ -1102,7 +1202,7 @@ function App(){
   const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||'');
   const[tab,setTab]=useState(0);
   const db=key?mkDB(key):null;
-  const TABS=['관심사','수신자','발송 설정','히스토리','유튜브','사주','카톡'];
+  const TABS=['관심사','수신자','발송 설정','히스토리','유튜브','사주','카톡','파일함'];
 
   if(!key)return h(KeySetup,{onSave:setKey});
 
@@ -1126,6 +1226,7 @@ function App(){
     tab===4&&h(TabYoutube,{db}),
     tab===5&&h(TabSaju,{db}),
     tab===6&&h(TabKakao,{db}),
+    tab===7&&h(TabFiles,{db}),
   );
 }
 
