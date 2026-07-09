@@ -536,13 +536,13 @@ function TabEmails({db}){
 }
 
 /* ── Tab: 발송 설정 ── */
-function TabSettings({db}){
-  // days DB: 숫자 배열 [1,2,3,4,5] (1=월)
-  const[hours,setHours]=useState([9]);  // 발송 시각 배열
-  const[addHour,setAddHour]=useState(12); // 추가할 시각 입력값
+function BriefingSection({db,title,emoji,prefix,invokeName}){
+  const[hours,setHours]=useState([9]);
+  const[addHour,setAddHour]=useState(12);
   const[days,setDays]=useState([1,2,3,4,5]);
   const[paused,setPaused]=useState(false);
   const[loading,setLoading]=useState(true);
+  const[saving,setSaving]=useState(false);
   const[sending,setSending]=useState(false);
   const[toast,toastEl]=useToast();
 
@@ -551,45 +551,49 @@ function TabSettings({db}){
       try{
         setLoading(true);
         const s=await db.getSettings();
-        // briefing_hours (배열) 우선, 없으면 briefing_hour (단일) 하위호환
-        if(s.briefing_hours!=null){
-          const arr=toArray(s.briefing_hours).map(Number).filter(n=>n>=0&&n<=23);
-          setHours(arr.length?arr:[9]);
-        }else if(s.briefing_hour!=null){
-          setHours([toNum(s.briefing_hour,9)]);
-        }
-        if(s.briefing_days!=null){
-          const arr=toArray(s.briefing_days).map(Number).filter(n=>n>=1&&n<=7);
-          setDays(arr.length?arr:[1,2,3,4,5]);
-        }
-        if(s.briefing_paused!=null)setPaused(toBool(s.briefing_paused));
+        const hk=`${prefix}_hours`, dk=`${prefix}_days`, pk=`${prefix}_paused`;
+        // 전용키 우선, 없으면 공통키 하위호환
+        const hRaw=s[hk]??s.briefing_hours;
+        if(hRaw!=null){const arr=toArray(hRaw).map(Number).filter(n=>n>=0&&n<=23);setHours(arr.length?arr:[9]);}
+        else if(s.briefing_hour!=null)setHours([toNum(s.briefing_hour,9)]);
+        const dRaw=s[dk]??s.briefing_days;
+        if(dRaw!=null){const arr=toArray(dRaw).map(Number).filter(n=>n>=1&&n<=7);setDays(arr.length?arr:[1,2,3,4,5]);}
+        const pRaw=s[pk]??s.briefing_paused;
+        if(pRaw!=null)setPaused(toBool(pRaw));
       }catch(e){toast(e.message,'err');}
       finally{setLoading(false);}
     })();
-  },[db]);
+  },[db,prefix]);
 
   const toggleDay=(n)=>setDays(d=>d.includes(n)?d.filter(x=>x!==n):[...d,n].sort((a,b)=>a-b));
-  const addHourToList=()=>{
+  const addH=()=>{
     const h=Math.min(23,Math.max(0,Number(addHour)));
     if(hours.includes(h)){toast(`${h}시는 이미 추가됐습니다`,'err');return;}
     setHours(arr=>[...arr,h].sort((a,b)=>a-b));
   };
-  const removeHour=(h)=>setHours(arr=>arr.filter(x=>x!==h));
+  const removeH=(h)=>setHours(arr=>arr.filter(x=>x!==h));
 
-  const saveAll=async()=>{
+  const save=async()=>{
+    setSaving(true);
     try{
-      // briefing_hours 배열 저장 + 하위호환을 위해 briefing_hour도 첫번째 값으로 유지
-      await db.setSetting('briefing_hours',hours);
-      await db.setSetting('briefing_hour',String(hours[0]??9));
-      await db.setSetting('briefing_days',days);
-      await db.setSetting('briefing_paused',paused);
-      toast('설정이 저장되었습니다');
+      await db.setSetting(`${prefix}_hours`,hours);
+      await db.setSetting(`${prefix}_days`,days);
+      await db.setSetting(`${prefix}_paused`,paused);
+      // 뉴스는 기존 키도 동시 저장 (하위호환)
+      if(prefix==='news'){
+        await db.setSetting('briefing_hours',hours);
+        await db.setSetting('briefing_hour',String(hours[0]??9));
+        await db.setSetting('briefing_days',days);
+        await db.setSetting('briefing_paused',paused);
+      }
+      toast(`${title} 설정 저장됐습니다`);
     }catch(e){toast(e.message,'err');}
+    finally{setSaving(false);}
   };
 
   const sendNow=async()=>{
     setSending(true);
-    try{await db.invoke('daily-briefing');toast('브리핑을 발송했습니다');}
+    try{await db.invoke(invokeName);toast(`${title} 발송했습니다`);}
     catch(e){toast(e.message,'err');}
     finally{setSending(false);}
   };
@@ -597,59 +601,60 @@ function TabSettings({db}){
   const togglePause=async()=>{
     const next=!paused;
     try{
-      await db.setSetting('briefing_paused',next);
+      await db.setSetting(`${prefix}_paused`,next);
+      if(prefix==='news')await db.setSetting('briefing_paused',next);
       setPaused(next);
-      toast(next?'브리핑을 일시정지했습니다':'브리핑을 재개했습니다');
+      toast(next?`${title} 일시정지`:`${title} 재개`);
     }catch(e){toast(e.message,'err');}
   };
 
   if(loading)return h('div',{class:'card'},h('div',{class:'empty'},h('span',{class:'spin spin-dark'})));
 
-  return h(Fragment,null,
-    toastEl,
-    paused&&h('div',{class:'pause-bar'},
-      h('span',null,'⏸ 브리핑 일시정지 중'),
-      h('button',{class:'btn btn-s btn-sm',onClick:togglePause},'재개')
+  return h('div',{class:'card'},
+    h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'},
+      h('div',{class:'ctitle',style:'margin:0'},`${emoji} ${title}`),
+      paused&&h('span',{style:'font-size:11px;background:#fee;color:#c00;border-radius:8px;padding:2px 8px;font-weight:600'},'⏸ 정지중')
     ),
-    h('div',{class:'card'},
-      h('div',{class:'ctitle'},'발송 시각'),
-      h('div',{style:'display:flex;gap:8px;align-items:center;margin-bottom:10px'},
+    toastEl,
+    h('div',{style:'margin-bottom:12px'},
+      h('div',{style:'font-size:12px;color:var(--txt2);font-weight:600;margin-bottom:6px'},'발송 시각'),
+      h('div',{style:'display:flex;gap:6px;align-items:center;margin-bottom:8px'},
         h('input',{type:'number',min:0,max:23,value:addHour,
-          onInput:e=>setAddHour(e.target.value),
-          style:'width:80px',placeholder:'시'}),
+          onInput:e=>setAddHour(e.target.value),style:'width:70px'}),
         h('span',{style:'color:var(--txt2);font-size:13px'},'시'),
-        h('button',{class:'btn btn-s btn-sm',onClick:addHourToList},'+ 추가')
+        h('button',{class:'btn btn-s btn-sm',onClick:addH},'+ 추가')
       ),
       hours.length===0
-        ? h('div',{style:'font-size:13px;color:var(--txt3)'},'발송 시각을 추가하세요')
-        : h('div',{style:'display:flex;flex-wrap:wrap;gap:6px'},
-            hours.map(h2=>
-              h('div',{key:h2,style:'display:flex;align-items:center;gap:4px;background:#f0f2ff;border-radius:16px;padding:4px 10px'},
-                h('span',{style:'font-size:13px;font-weight:600;color:var(--p)'},`${h2}:00`),
-                h('button',{style:'border:none;background:none;cursor:pointer;color:var(--txt3);font-size:12px;padding:0',
-                  onClick:()=>removeHour(h2)},'✕')
-              )
-            )
-          )
-    ),
-    h('div',{class:'card'},
-      h('div',{class:'ctitle'},'발송 요일'),
-      h('div',{class:'days'},
-        DAY_NUMS.map((n,i)=>
-          h('button',{class:`day${days.includes(n)?' on':''}`,onClick:()=>toggleDay(n)},DAYS_KR[i])
+        ?h('div',{style:'font-size:12px;color:var(--txt3)'},'시각을 추가하세요')
+        :h('div',{style:'display:flex;flex-wrap:wrap;gap:5px'},
+          hours.map(h2=>h('div',{key:h2,style:'display:flex;align-items:center;gap:3px;background:#f0f2ff;border-radius:14px;padding:3px 10px'},
+            h('span',{style:'font-size:12px;font-weight:600;color:var(--p)'},`${h2}:00`),
+            h('button',{style:'border:none;background:none;cursor:pointer;color:var(--txt3);font-size:11px;padding:0 0 0 2px',
+              onClick:()=>removeH(h2)},'✕')
+          ))
         )
+    ),
+    h('div',{style:'margin-bottom:12px'},
+      h('div',{style:'font-size:12px;color:var(--txt2);font-weight:600;margin-bottom:6px'},'발송 요일'),
+      h('div',{class:'days'},
+        DAY_NUMS.map((n,i)=>h('button',{class:`day${days.includes(n)?' on':''}`,onClick:()=>toggleDay(n)},DAYS_KR[i]))
       )
     ),
-    h('div',{class:'card'},
-      h('div',{class:'ctitle'},'제어'),
-      h('div',{style:'display:flex;gap:10px;flex-wrap:wrap'},
-        h('button',{class:'btn btn-p',onClick:saveAll},'💾 설정 저장'),
-        h('button',{class:'btn btn-s',disabled:sending,onClick:sendNow},
-          sending?h('span',{class:'spin'}):null,' 즉시 발송'
-        ),
-        h('button',{class:'btn btn-s',onClick:togglePause},paused?'▶ 재개':'⏸ 일시정지')
-      )
+    h('div',{style:'display:flex;gap:6px;flex-wrap:wrap'},
+      h('button',{class:'btn btn-p btn-sm',onClick:save,disabled:saving},saving?h('span',{class:'spin'}):null,'💾 저장'),
+      h('button',{class:'btn btn-s btn-sm',onClick:sendNow,disabled:sending},
+        sending?h('span',{class:'spin'}):null,` ${emoji} 즉시발송`),
+      h('button',{class:`btn btn-sm${paused?' btn-d':''}`,onClick:togglePause},
+        paused?'▶ 재개':'⏸ 일시정지')
     )
+  );
+}
+
+function TabSettings({db}){
+  return h(Fragment,null,
+    h(BriefingSection,{db,title:'뉴스 브리핑',emoji:'📰',prefix:'news',invokeName:'daily-briefing'}),
+    h(BriefingSection,{db,title:'유튜브 브리핑',emoji:'📺',prefix:'youtube',invokeName:'youtube-briefing'}),
+    h(BriefingSection,{db,title:'사주 브리핑',emoji:'🔮',prefix:'saju',invokeName:'saju-briefing'})
   );
 }
 
