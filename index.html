@@ -273,6 +273,50 @@ function mkDB(key){
       const txt=await res.text();
       if(!res.ok)throw new Error(txt||res.statusText);
       return txt?JSON.parse(txt):{};
+    },
+    // ── 카톡 나에게 보내기 ──
+    async kakaoSendText(text){
+      const res=await fetch(`${SUPA_URL}/functions/v1/kakao-send`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({type:'text',text})
+      });
+      const txt=await res.text();
+      if(!res.ok)throw new Error(txt||res.statusText);
+      return txt?JSON.parse(txt):{};
+    },
+    async kakaoSendImage(imageUrl,title,desc){
+      const res=await fetch(`${SUPA_URL}/functions/v1/kakao-send`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({type:'image',imageUrl,title,desc})
+      });
+      const txt=await res.text();
+      if(!res.ok)throw new Error(txt||res.statusText);
+      return txt?JSON.parse(txt):{};
+    },
+    async kakaoSendLink(title,url,desc){
+      const res=await fetch(`${SUPA_URL}/functions/v1/kakao-send`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({type:'link',title,url,desc})
+      });
+      const txt=await res.text();
+      if(!res.ok)throw new Error(txt||res.statusText);
+      return txt?JSON.parse(txt):{};
+    },
+    async kakaoSendFile(file){
+      // Supabase Storage 업로드 후 링크 발송
+      const fname=`${Date.now()}_${file.name}`;
+      const uploadRes=await fetch(`${SUPA_URL}/storage/v1/object/kakao-files/${fname}`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':file.type||'application/octet-stream'},
+        body:file
+      });
+      if(!uploadRes.ok){const t=await uploadRes.text();throw new Error('파일 업로드 실패: '+t);}
+      const fileUrl=`${SUPA_URL}/storage/v1/object/public/kakao-files/${fname}`;
+      // 링크로 카톡 발송
+      return this.kakaoSendLink(file.name,fileUrl,`파일 크기: ${(file.size/1024).toFixed(1)}KB`);
     }
   };
 }
@@ -915,6 +959,130 @@ function TabSaju({db}){
   );
 }
 
+/* ── Tab: 카톡 나에게 보내기 ── */
+function TabKakao({db}){
+  const[tab,setTab]=useState(0);
+  const[toast,toastEl]=useToast();
+  // 텍스트
+  const[text,setText]=useState('');
+  const[textSending,setTextSending]=useState(false);
+  // 이미지
+  const[imgUrl,setImgUrl]=useState('');
+  const[imgTitle,setImgTitle]=useState('');
+  const[imgDesc,setImgDesc]=useState('');
+  const[imgSending,setImgSending]=useState(false);
+  // 링크
+  const[linkTitle,setLinkTitle]=useState('');
+  const[linkUrl,setLinkUrl]=useState('');
+  const[linkDesc,setLinkDesc]=useState('');
+  const[linkSending,setLinkSending]=useState(false);
+  // 파일
+  const[file,setFile]=useState(null);
+  const[fileSending,setFileSending]=useState(false);
+  const fileRef=useRef(null);
+
+  const sendText=async()=>{
+    if(!text.trim()){toast('내용을 입력하세요','err');return;}
+    setTextSending(true);
+    try{await db.kakaoSendText(text);toast('카톡 전송 완료!');setText('');}
+    catch(e){toast(e.message,'err');}
+    finally{setTextSending(false);}
+  };
+
+  const sendImage=async()=>{
+    if(!imgUrl.trim()){toast('이미지 URL을 입력하세요','err');return;}
+    setImgSending(true);
+    try{await db.kakaoSendImage(imgUrl,imgTitle||'이미지',imgDesc);toast('이미지 전송 완료!');setImgUrl('');setImgTitle('');setImgDesc('');}
+    catch(e){toast(e.message,'err');}
+    finally{setImgSending(false);}
+  };
+
+  const sendLink=async()=>{
+    if(!linkUrl.trim()||!linkTitle.trim()){toast('제목과 URL을 입력하세요','err');return;}
+    setLinkSending(true);
+    try{await db.kakaoSendLink(linkTitle,linkUrl,linkDesc);toast('링크 전송 완료!');setLinkTitle('');setLinkUrl('');setLinkDesc('');}
+    catch(e){toast(e.message,'err');}
+    finally{setLinkSending(false);}
+  };
+
+  const sendFile=async()=>{
+    if(!file){toast('파일을 선택하세요','err');return;}
+    setFileSending(true);
+    try{await db.kakaoSendFile(file);toast('파일 링크 전송 완료!');setFile(null);if(fileRef.current)fileRef.current.value='';}
+    catch(e){toast(e.message,'err');}
+    finally{setFileSending(false);}
+  };
+
+  const STABS=['💬 텍스트','🖼 이미지','🔗 링크','📎 파일'];
+
+  return h(Fragment,null,
+    toastEl,
+    h('div',{class:'card'},
+      h('div',{class:'ctitle'},'카톡 나에게 보내기'),
+      h('div',{style:'display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap'},
+        STABS.map((t,i)=>h('button',{key:i,
+          class:`btn btn-sm${tab===i?' btn-p':''}`,
+          onClick:()=>setTab(i)},t))
+      ),
+
+      tab===0&&h(Fragment,null,
+        h('textarea',{placeholder:'카톡으로 보낼 내용을 입력하세요...',rows:5,
+          value:text,onInput:e=>setText(e.target.value),
+          style:'width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px'}),
+        h('div',{style:'font-size:11px;color:var(--txt3);margin-bottom:8px'},`${text.length}자`),
+        h('button',{class:'btn btn-p',style:'width:100%',disabled:textSending,onClick:sendText},
+          textSending?h('span',{class:'spin'}):null,' 📤 카톡 전송')
+      ),
+
+      tab===1&&h(Fragment,null,
+        h('input',{placeholder:'이미지 URL (https://...)',value:imgUrl,
+          onInput:e=>setImgUrl(e.target.value),style:'width:100%;box-sizing:border-box;margin-bottom:8px'}),
+        h('input',{placeholder:'제목 (선택)',value:imgTitle,
+          onInput:e=>setImgTitle(e.target.value),style:'width:100%;box-sizing:border-box;margin-bottom:8px'}),
+        h('input',{placeholder:'설명 (선택)',value:imgDesc,
+          onInput:e=>setImgDesc(e.target.value),style:'width:100%;box-sizing:border-box;margin-bottom:10px'}),
+        imgUrl&&h('img',{src:imgUrl,alt:'미리보기',
+          style:'width:100%;max-height:200px;object-fit:contain;border-radius:6px;margin-bottom:10px',
+          onError:e=>{e.target.style.display='none';}}),
+        h('button',{class:'btn btn-p',style:'width:100%',disabled:imgSending,onClick:sendImage},
+          imgSending?h('span',{class:'spin'}):null,' 🖼 이미지 전송')
+      ),
+
+      tab===2&&h(Fragment,null,
+        h('input',{placeholder:'제목 *',value:linkTitle,
+          onInput:e=>setLinkTitle(e.target.value),style:'width:100%;box-sizing:border-box;margin-bottom:8px'}),
+        h('input',{placeholder:'URL * (https://...)',value:linkUrl,
+          onInput:e=>setLinkUrl(e.target.value),style:'width:100%;box-sizing:border-box;margin-bottom:8px'}),
+        h('input',{placeholder:'설명 (선택)',value:linkDesc,
+          onInput:e=>setLinkDesc(e.target.value),style:'width:100%;box-sizing:border-box;margin-bottom:10px'}),
+        h('button',{class:'btn btn-p',style:'width:100%',disabled:linkSending,onClick:sendLink},
+          linkSending?h('span',{class:'spin'}):null,' 🔗 링크 전송')
+      ),
+
+      tab===3&&h(Fragment,null,
+        h('div',{style:'background:#f8f9fa;border:2px dashed var(--bdr);border-radius:8px;padding:20px;text-align:center;margin-bottom:10px',
+          onClick:()=>fileRef.current&&fileRef.current.click(),
+          style:'cursor:pointer;background:#f8f9fa;border:2px dashed var(--bdr);border-radius:8px;padding:20px;text-align:center;margin-bottom:10px'},
+          h('input',{type:'file',ref:fileRef,style:'display:none',
+            onChange:e=>setFile(e.target.files[0]||null)}),
+          file
+            ? h(Fragment,null,
+                h('div',{style:'font-size:14px;font-weight:600;color:var(--p)'},file.name),
+                h('div',{style:'font-size:12px;color:var(--txt3);margin-top:4px'},`${(file.size/1024).toFixed(1)}KB`))
+            : h(Fragment,null,
+                h('div',{style:'font-size:24px;margin-bottom:6px'},'📎'),
+                h('div',{style:'font-size:13px;color:var(--txt2)'},'클릭해서 파일 선택'))
+        ),
+        h('div',{style:'font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.6'},
+          '※ 파일은 Supabase Storage에 업로드 후 다운로드 링크로 발송됩니다.',h('br'),
+          '※ SQL Editor에서 kakao-files 버킷 생성 필요 (아직 안 하셨으면 먼저 실행하세요)'),
+        h('button',{class:'btn btn-p',style:'width:100%',disabled:fileSending||!file,onClick:sendFile},
+          fileSending?h('span',{class:'spin'}):null,' 📎 파일 업로드 후 전송')
+      )
+    )
+  );
+}
+
 /* ── Key Setup ── */
 function KeySetup({onSave}){
   const[v,setV]=useState('');
@@ -934,7 +1102,7 @@ function App(){
   const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||'');
   const[tab,setTab]=useState(0);
   const db=key?mkDB(key):null;
-  const TABS=['관심사','수신자','발송 설정','히스토리','유튜브','사주'];
+  const TABS=['관심사','수신자','발송 설정','히스토리','유튜브','사주','카톡'];
 
   if(!key)return h(KeySetup,{onSave:setKey});
 
@@ -957,6 +1125,7 @@ function App(){
     tab===3&&h(TabHistory,{db}),
     tab===4&&h(TabYoutube,{db}),
     tab===5&&h(TabSaju,{db}),
+    tab===6&&h(TabKakao,{db}),
   );
 }
 
