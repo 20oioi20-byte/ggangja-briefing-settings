@@ -387,8 +387,25 @@ function InterestModal({item,onSave,onClose}){
     h('div',{class:'frow'},h('label',null,'이름'),
       h('input',{placeholder:'예: 코스피 지수',value:f.label,onInput:e=>set('label',e.target.value)})
     ),
-    h('div',{class:'frow'},h('label',null,'키워드 (쉼표 구분)'),
-      h('textarea',{placeholder:'예: 코스피, KOSPI, 주가지수',value:f.target,onInput:e=>set('target',e.target.value)})
+    h('div',{class:'frow'},
+      h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px'},
+        h('label',{style:'margin:0'},'키워드 (쉼표 구분)'),
+        h('button',{class:'btn btn-s btn-sm',style:'font-size:11px',
+          onClick:async()=>{
+            if(!f.label){alert('이름을 먼저 입력하세요');return;}
+            try{
+              const res=await fetch('https://api.anthropic.com/v1/messages',{
+                method:'POST',
+                headers:{'Content-Type':'application/json','x-api-key':localStorage.getItem('ggangja_anon_key')||'','anthropic-version':'2023-06-01'},
+                body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,messages:[{role:'user',content:`네이버 뉴스 검색 API용 최적 키워드를 추천해줘. 관심사: "${f.label}". 쉼표로 구분된 4~6개 검색어만 출력. 예시: "KB손해보험, KB손보, KB손해보험 콜센터, KB손보 AICC"`}]})
+              });
+              const data=await res.json();
+              const kw=(data?.content?.[0]?.text||'').trim();
+              if(kw)set('target',kw);
+            }catch(e){alert('키워드 추천 실패: '+e.message);}
+          }},'🤖 AI 추천')
+      ),
+      h('textarea',{placeholder:'예: 코스피, KOSPI, 주가지수',value:f.target,rows:3,onInput:e=>set('target',e.target.value)})
     ),
     h('div',{class:'frow'},h('label',null,`수집 건수 — ${f.extra}건`),
       h('select',{value:f.extra,onChange:e=>set('extra',Number(e.target.value))},
@@ -462,6 +479,28 @@ function TabInterests({db}){
           ),
           h('span',{class:'badge'},TYPES[item.type]||item.type),
           h('div',{class:'iact'},
+            h('button',{class:'btn btn-sm',style:'padding:2px 6px',title:'위로',
+              onClick:async()=>{
+                const idx=items.findIndex(x=>x.id===item.id);
+                if(idx===0)return;
+                const other=items[idx-1];
+                try{
+                  await db.updateInterest(item.id,{sort_order:other.sort_order});
+                  await db.updateInterest(other.id,{sort_order:item.sort_order});
+                  load();
+                }catch(e){toast(e.message,'err');}
+              }},'↑'),
+            h('button',{class:'btn btn-sm',style:'padding:2px 6px',title:'아래로',
+              onClick:async()=>{
+                const idx=items.findIndex(x=>x.id===item.id);
+                if(idx===items.length-1)return;
+                const other=items[idx+1];
+                try{
+                  await db.updateInterest(item.id,{sort_order:other.sort_order});
+                  await db.updateInterest(other.id,{sort_order:item.sort_order});
+                  load();
+                }catch(e){toast(e.message,'err');}
+              }},'↓'),
             h('button',{class:'btn btn-s btn-sm',onClick:()=>setModal(item)},'✏️'),
             h('button',{class:'btn btn-d btn-sm',onClick:()=>remove(item.id)},'🗑️')
           )
@@ -494,23 +533,54 @@ function TabEmails({db}){
     })();
   },[db]);
 
-  const persist=async(list)=>{
-    // 항상 쉼표구분 문자열로 저장
-    await db.setSetting('briefing_emails',list.join(','));
-    setEmails(list);
+  const[disabled,setDisabled]=useState([]);
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const s=await db.getSettings();
+        const v=s['briefing_emails_disabled'];
+        if(v){const arr=Array.isArray(v)?v.map(String):String(v).split(',').map(x=>x.trim()).filter(Boolean);setDisabled(arr);}
+      }catch(e){}
+    })();
+  },[db]);
+
+  const persist=async(activeList,disabledList)=>{
+    await db.setSetting('briefing_emails',activeList.join(','));
+    await db.setSetting('briefing_emails_disabled',(disabledList||disabled).join(','));
+    setEmails(activeList);
+    if(disabledList!==undefined)setDisabled(disabledList);
   };
   const add=async()=>{
     const e=input.trim();
     if(!e||!e.includes('@')){toast('올바른 이메일을 입력하세요','err');return;}
-    if(emails.includes(e)){toast('이미 등록된 이메일입니다','err');return;}
-    try{await persist([...emails,e]);setInput('');toast('추가되었습니다');}
+    if(emails.includes(e)||disabled.includes(e)){toast('이미 등록된 이메일입니다','err');return;}
+    try{await persist([...emails,e],disabled);setInput('');toast('추가되었습니다');}
     catch(err){toast(err.message,'err');}
   };
-  const remove=async(e)=>{
+  const remove=async(e,isDisabled)=>{
     if(!confirm(`${e}을 삭제하시겠습니까?`))return;
-    try{await persist(emails.filter(x=>x!==e));toast('삭제되었습니다');}
-    catch(err){toast(err.message,'err');}
+    try{
+      if(isDisabled)await persist(emails,disabled.filter(x=>x!==e));
+      else await persist(emails.filter(x=>x!==e),disabled);
+      toast('삭제되었습니다');
+    }catch(err){toast(err.message,'err');}
   };
+  const toggleActive=async(e,isActive)=>{
+    try{
+      if(isActive){
+        // 활성 → 비활성
+        await persist(emails.filter(x=>x!==e),[...disabled,e]);
+        toast(`${e} 비활성화`);
+      }else{
+        // 비활성 → 활성
+        await persist([...emails,e],disabled.filter(x=>x!==e));
+        toast(`${e} 활성화`);
+      }
+    }catch(err){toast(err.message,'err');}
+  };
+
+  const allEmails=[...emails.map(e=>({e,active:true})),...disabled.map(e=>({e,active:false}))];
 
   return h(Fragment,null,
     toastEl,
@@ -524,11 +594,15 @@ function TabEmails({db}){
         h('button',{class:'btn btn-p',onClick:add},'추가')
       ),
       loading?h('div',{class:'empty'},h('span',{class:'spin spin-dark'})):
-      emails.length===0?h('div',{class:'empty'},'등록된 수신자가 없습니다'):
-      h('div',{class:'elist'},emails.map(e=>
-        h('div',{class:'erow',key:e},
-          h('span',{class:'eaddr'},e),
-          h('button',{class:'btn btn-d btn-sm',onClick:()=>remove(e)},'삭제')
+      allEmails.length===0?h('div',{class:'empty'},'등록된 수신자가 없습니다'):
+      h('div',{class:'ilist'},allEmails.map(({e,active})=>
+        h('div',{class:`irow${active?'':' off'}`,key:e},
+          h('button',{class:`tgl${active?' on':''}`,onClick:()=>toggleActive(e,active)}),
+          h('div',null,
+            h('div',{class:'ilabel'},e),
+            h('div',{class:'imeta'},active?'✅ 발송 활성':'⏸ 발송 중지')
+          ),
+          h('button',{class:'btn btn-d btn-sm',onClick:()=>remove(e,!active)},'삭제')
         )
       ))
     )
@@ -987,11 +1061,10 @@ function TabSaju({db}){
         '받을 구성원을 선택하면 각각 개별 발송됩니다.'),
       members.length===0?h('div',{class:'empty'},'등록된 구성원이 없습니다'):
       h('div',{style:'margin-bottom:12px'},
-        members.map(m=>h('label',{key:m.id,style:'display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer'},
-          h('input',{type:'checkbox',checked:!!annualChecked[m.id],
+        members.map(m=>h('label',{key:m.id,style:'display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;padding:6px 0'},
+          h('input',{type:'checkbox',style:'width:16px;height:16px;flex-shrink:0;cursor:pointer;margin:0',checked:!!annualChecked[m.id],
             onChange:e=>setAnnualChecked(c=>({...c,[m.id]:e.target.checked}))}),
-          h('span',{style:'font-size:14px'},m.name+(m.relationship?` (${m.relationship})`:'')),
-          !m.is_active&&h('span',{style:'font-size:11px;color:var(--txt3)'},' 비활성')
+          h('span',{style:'font-size:14px;flex:1'},m.name+(m.relationship?` (${m.relationship})`:'')+(!m.is_active?' [비활성]':''))
         ))
       ),
       h('button',{class:'btn btn-s',disabled:annualSending,onClick:sendAnnual},
