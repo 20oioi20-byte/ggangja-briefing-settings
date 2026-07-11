@@ -353,6 +353,16 @@ function mkDB(key){
       });
       if(!res.ok)throw new Error(await res.text());
       return await res.json();
+    },
+    async suggestKeyword(label){
+      const res=await fetch(`${SUPA_URL}/functions/v1/keyword-suggest`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({label})
+      });
+      const data=await res.json();
+      if(data.error)throw new Error(data.error);
+      return data.keywords||'';
     }
   };
 }
@@ -385,7 +395,7 @@ function Modal({title,onClose,children}){
 }
 
 /* ── 관심사 모달 ── */
-function InterestModal({item,onSave,onClose}){
+function InterestModal({item,onSave,onClose,db}){
   const isEdit=!!item?.id;
   const[f,setF]=useState({
     type:item?.type||'news',
@@ -412,15 +422,8 @@ function InterestModal({item,onSave,onClose}){
           onClick:async()=>{
             if(!f.label){alert('이름을 먼저 입력하세요');return;}
             try{
-              const res=await fetch(`${SUPA_URL}/functions/v1/keyword-suggest`,{
-                method:'POST',
-                headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-                body:JSON.stringify({label:f.label})
-              });
-              const data=await res.json();
-              if(data.error)throw new Error(data.error);
-              const kw=(data.keywords||'').trim();
-              if(kw)set('target',kw);
+              const kw=await db.suggestKeyword(f.label);
+              if(kw)set('target',kw.trim());
             }catch(e){alert('키워드 추천 실패: '+e.message);}
           }},'🤖 AI 추천')
       ),
@@ -481,7 +484,7 @@ function TabInterests({db}){
 
   return h(Fragment,null,
     toastEl,
-    modal!==null&&h(InterestModal,{item:modal==='add'?null:modal,onSave:save,onClose:()=>setModal(null)}),
+    modal!==null&&h(InterestModal,{item:modal==='add'?null:modal,onSave:save,onClose:()=>setModal(null),db}),
     h('div',{class:'card'},
       h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px'},
         h('div',{class:'ctitle',style:'margin:0'},`관심사 목록 (${items.length}개)`),
