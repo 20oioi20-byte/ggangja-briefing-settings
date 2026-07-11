@@ -412,13 +412,14 @@ function InterestModal({item,onSave,onClose}){
           onClick:async()=>{
             if(!f.label){alert('이름을 먼저 입력하세요');return;}
             try{
-              const res=await fetch('https://api.anthropic.com/v1/messages',{
+              const res=await fetch(`${SUPA_URL}/functions/v1/keyword-suggest`,{
                 method:'POST',
-                headers:{'Content-Type':'application/json','x-api-key':localStorage.getItem('ggangja_anon_key')||'','anthropic-version':'2023-06-01'},
-                body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,messages:[{role:'user',content:`네이버 뉴스 검색 API용 최적 키워드를 추천해줘. 관심사: "${f.label}". 쉼표로 구분된 4~6개 검색어만 출력. 예시: "KB손해보험, KB손보, KB손해보험 콜센터, KB손보 AICC"`}]})
+                headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+                body:JSON.stringify({label:f.label})
               });
               const data=await res.json();
-              const kw=(data?.content?.[0]?.text||'').trim();
+              if(data.error)throw new Error(data.error);
+              const kw=(data.keywords||'').trim();
               if(kw)set('target',kw);
             }catch(e){alert('키워드 추천 실패: '+e.message);}
           }},'🤖 AI 추천')
