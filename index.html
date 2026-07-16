@@ -640,6 +640,7 @@ function BriefingSection({db,title,emoji,prefix,invokeName}){
   const[loading,setLoading]=useState(true);
   const[saving,setSaving]=useState(false);
   const[sending,setSending]=useState(false);
+  const[newsApi,setNewsApi]=useState('naver');  // 뉴스 API 선택 (news prefix만)
   const[toast,toastEl]=useToast();
 
   useEffect(()=>{
@@ -648,6 +649,7 @@ function BriefingSection({db,title,emoji,prefix,invokeName}){
         setLoading(true);
         const s=await db.getSettings();
         const hk=`${prefix}_hours`, dk=`${prefix}_days`, pk=`${prefix}_paused`;
+        if(prefix==='news'&&s.news_api_provider)setNewsApi(s.news_api_provider);
         // 전용키 우선, 없으면 공통키 하위호환
         const hRaw=s[hk]??s.briefing_hours;
         if(hRaw!=null){const arr=toArray(hRaw).map(Number).filter(n=>n>=0&&n<=23);setHours(arr.length?arr:[9]);}
@@ -709,6 +711,23 @@ function BriefingSection({db,title,emoji,prefix,invokeName}){
       paused&&h('span',{style:'font-size:11px;background:rgba(254,46,54,.15);color:var(--red);border-radius:8px;padding:2px 8px;font-weight:600'},'⏸ 정지중')
     ),
     toastEl,
+    prefix==='news'&&h('div',{style:'margin-bottom:14px'},
+      h('div',{style:'font-size:12px;color:var(--txt2);font-weight:600;margin-bottom:6px'},'뉴스 수집 API'),
+      h('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},
+        [['naver','🔵 네이버 API (현재)'],['ncp','🟢 NCP API Hub']].map(([v,label])=>
+          h('label',{key:v,
+            style:`display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 14px;border-radius:999px;border:1px solid ${newsApi===v?'var(--acc)':'var(--brd)'};background:${newsApi===v?'rgba(0,113,227,.15)':'transparent'}`},
+            h('input',{type:'radio',name:'newsApiProv',value:v,checked:newsApi===v,style:'display:none',
+              onChange:async()=>{
+                setNewsApi(v);
+                try{await db.setSetting('news_api_provider',v);toast(v==='ncp'?'NCP API Hub 기본으로 설정':'네이버 API 기본으로 설정');}
+                catch(e){toast(e.message,'err');}
+              }}),
+            h('span',{style:`font-size:12px;font-weight:600;color:${newsApi===v?'var(--acc)':'var(--txt2)'}`},label)
+          )
+        )
+      )
+    ),
     h('div',{style:'margin-bottom:12px'},
       h('div',{style:'font-size:12px;color:var(--txt2);font-weight:600;margin-bottom:6px'},'발송 시각'),
       h('div',{style:'display:flex;gap:6px;align-items:center;margin-bottom:8px'},
@@ -811,13 +830,14 @@ function TabHistory({db}){
   const getDetail=(item)=>{
     try{
       const c=JSON.parse(item.content||'{}');
+      const provLine=c._provider?`🔌 AI Provider: ${c._provider}\n${'─'.repeat(30)}\n`:'';
       if(c._type==='saju')
-        return (c.members||[]).map(m=>`【${m.name}】\n운세: ${m.fortune||''}\n주의: ${m.caution||''}\n행운: ${m.lucky||''}`).join('\n\n');
+        return provLine+(c.members||[]).map(m=>`【${m.name}】\n운세: ${m.fortune||''}\n주의: ${m.caution||''}\n행운: ${m.lucky||''}`).join('\n\n');
       if(c._type==='youtube')
-        return (c.videos||[]).join('\n');
+        return provLine+(c.videos||[]).join('\n');
       // 뉴스
       const news=(c.news||[]).map(n=>`[${n.category}] ${n.title}`).join('\n');
-      return `📌 ${c.summary||''}\n\n${news}\n\n💡 ${c.insight||''}`;
+      return `${provLine}📌 ${c.summary||''}\n\n${news}\n\n💡 ${c.insight||''}`;
     }catch{return item.content||'';}
   };
 
