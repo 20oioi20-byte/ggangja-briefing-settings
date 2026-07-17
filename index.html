@@ -429,10 +429,12 @@ function InterestModal({item,onSave,onClose,db}){
       ),
       h('textarea',{placeholder:'예: 코스피, KOSPI, 주가지수',value:f.target,rows:3,onInput:e=>set('target',e.target.value)})
     ),
-    h('div',{class:'frow'},h('label',null,`수집 건수 — ${f.extra}건`),
+    h('div',{class:'frow'},h('label',null,`수집 후보 건수 — ${f.extra}건`),
       h('select',{value:f.extra,onChange:e=>set('extra',Number(e.target.value))},
         COUNTS.map(n=>h('option',{value:n},`${n}건`))
-      )
+      ),
+      h('div',{style:'font-size:11px;color:var(--txt3);margin-top:4px;line-height:1.5'},
+        '네이버에서 가져올 후보 수입니다. 브리핑에는 관심사당 최대 3건만 실리고, 0건이면 해당 관심사는 생략됩니다.')
     ),
     h('div',{class:'frow'},h('label',null,'정렬 순서'),
       h('input',{type:'number',value:f.sort_order,onInput:e=>set('sort_order',Number(e.target.value))})
@@ -497,7 +499,7 @@ function TabInterests({db}){
           h('button',{class:`tgl${item.is_active?' on':''}`,onClick:()=>toggle(item)}),
           h('div',null,
             h('div',{class:'ilabel'},item.label),
-            h('div',{class:'imeta'},`${item.target||'키워드 없음'} · ${item.extra||5}건`)
+            h('div',{class:'imeta'},`${item.target||'키워드 없음'} · 후보 ${item.extra||5}건 · 브리핑 최대 3건`)
           ),
           h('span',{class:'badge'},TYPES[item.type]||item.type),
           h('div',{class:'iact'},

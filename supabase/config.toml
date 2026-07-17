@@ -1,0 +1,6 @@
+﻿# ggangja-briefing-settings — Edge Functions
+# project_id is set via `supabase link` or --project-ref at deploy time
+project_id = "zbiwyqwjehnogxkzlhxx"
+
+[functions.daily-briefing]
+verify_jwt = false
