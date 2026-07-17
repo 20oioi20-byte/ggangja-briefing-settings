@@ -119,7 +119,136 @@ async function getEmails(): Promise<string[]> {
     .filter(Boolean);
 }
 
-async function getRecentlySentUrls(): Promise<Set<string>> {
+type NewsItem = {
+  interestId: string | number;
+  category: string;
+  title: string;
+  summary: string;
+  url: string;
+  publishedAt: string;
+};
+
+type PriorFingerprints = {
+  urls: Set<string>;
+  /** 정규화 전 원문 제목·한줄요약 (유사도 비교용) */
+  texts: string[];
+};
+
+/** 제목/요약 비교용 정규화: 공백·구두점·언론 접두 제거 */
+function normalizeText(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .replace(/<\/?b>/g, "")
+    .replace(/(속보|단독|종합|영상|포토|전문|특징주|공시)\s*/g, "")
+    .replace(/[\s\[\]\(\)\{\}「」『』"'“”‘’·•…\-_=~|/\\<>]+/g, "")
+    .replace(/[.,!?:;，。！？、·]/g, "")
+    .trim();
+}
+
+/** URL 정규화: 트래킹 파라미터 제거 후 비교 */
+function normalizeUrl(u: string): string {
+  try {
+    const x = new URL(u);
+    // 흔한 트래킹 파라미터 제거
+    ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid", "gclid", "ref"].forEach(
+      (k) => x.searchParams.delete(k),
+    );
+    x.hash = "";
+    let host = x.hostname.replace(/^www\./, "");
+    return `${host}${x.pathname}`.replace(/\/+$/, "").toLowerCase();
+  } catch {
+    return (u || "").split("?")[0].replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+function tokenizeForSim(s: string): Set<string> {
+  const tokens = new Set<string>();
+  const raw = (s || "").toLowerCase();
+  for (const w of raw.split(/[^\p{L}\p{N}]+/u)) {
+    if (w.length >= 2) tokens.add(w);
+  }
+  const n = normalizeText(s);
+  // 한글 등 붙여쓴 문장용 bigram
+  for (let i = 0; i < n.length - 1; i++) {
+    tokens.add(n.slice(i, i + 2));
+  }
+  if (n.length >= 3) {
+    for (let i = 0; i < n.length - 2; i++) {
+      tokens.add(n.slice(i, i + 3));
+    }
+  }
+  return tokens;
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const x of a) if (b.has(x)) inter++;
+  return inter / (a.size + b.size - inter);
+}
+
+/**
+ * 비슷한 내용 판정
+ * - 동일/포함 제목
+ * - 앞부분 긴 접두 일치
+ * - 토큰 Jaccard (제목 / 제목+요약)
+ */
+function isSimilarContent(
+  aTitle: string,
+  aSummary: string,
+  bTitle: string,
+  bSummary = "",
+  titleThreshold = 0.52,
+  bodyThreshold = 0.48,
+): boolean {
+  const na = normalizeText(aTitle);
+  const nb = normalizeText(bTitle);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+
+  // 한쪽이 다른 쪽을 포함 (같은 이슈 재전송)
+  const minLen = Math.min(na.length, nb.length);
+  if (minLen >= 10 && (na.includes(nb) || nb.includes(na))) return true;
+
+  const prefixLen = Math.min(18, na.length, nb.length);
+  if (prefixLen >= 12 && na.slice(0, prefixLen) === nb.slice(0, prefixLen)) {
+    return true;
+  }
+
+  if (jaccard(tokenizeForSim(aTitle), tokenizeForSim(bTitle)) >= titleThreshold) {
+    return true;
+  }
+
+  // 제목 ↔ 상대 요약
+  if (bSummary && jaccard(tokenizeForSim(aTitle), tokenizeForSim(bSummary)) >= bodyThreshold + 0.05) {
+    return true;
+  }
+  if (aSummary && jaccard(tokenizeForSim(aSummary), tokenizeForSim(bTitle)) >= bodyThreshold + 0.05) {
+    return true;
+  }
+
+  // 요약끼리 (충분히 긴 경우만)
+  if (
+    aSummary &&
+    bSummary &&
+    aSummary.length >= 24 &&
+    bSummary.length >= 24 &&
+    jaccard(tokenizeForSim(aSummary), tokenizeForSim(bSummary)) >= bodyThreshold
+  ) {
+    return true;
+  }
+
+  // 제목+요약 합친 시그니처
+  const sa = tokenizeForSim(`${aTitle} ${aSummary || ""}`);
+  const sb = tokenizeForSim(`${bTitle} ${bSummary || ""}`);
+  if (sa.size >= 8 && sb.size >= 8 && jaccard(sa, sb) >= bodyThreshold) {
+    return true;
+  }
+
+  return false;
+}
+
+async function getRecentlySentFingerprints(): Promise<PriorFingerprints> {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const fromDate = sevenDaysAgo.toISOString().slice(0, 10);
@@ -130,26 +259,88 @@ async function getRecentlySentUrls(): Promise<Set<string>> {
     .gte("date", fromDate);
 
   const urls = new Set<string>();
+  const texts: string[] = [];
   const urlRegex = /"url"\s*:\s*"(https?:\/\/[^"]+)"/g;
+  const titleRegex = /"title"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+  const onelineRegex = /"oneline"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+
   for (const row of data || []) {
     const content = row.content || "";
-    let match;
-    while ((match = urlRegex.exec(content)) !== null) {
-      urls.add(match[1]);
+    let m;
+    while ((m = urlRegex.exec(content)) !== null) {
+      urls.add(m[1]);
+      urls.add(normalizeUrl(m[1]));
+    }
+    while ((m = titleRegex.exec(content)) !== null) {
+      const t = m[1].replace(/\\n/g, " ").replace(/\\"/g, "'").trim();
+      if (t) texts.push(t);
+    }
+    while ((m = onelineRegex.exec(content)) !== null) {
+      const t = m[1].replace(/\\n/g, " ").replace(/\\"/g, "'").trim();
+      if (t) texts.push(t);
     }
   }
-  console.log(`최근 7일 발송된 기사 URL: ${urls.size}건`);
-  return urls;
+  console.log(
+    `최근 7일 지문: URL ${urls.size}개, 텍스트(제목·요약) ${texts.length}개`,
+  );
+  return { urls, texts };
 }
 
-type NewsItem = {
-  interestId: string | number;
-  category: string;
-  title: string;
-  summary: string;
-  url: string;
-  publishedAt: string;
-};
+/**
+ * URL + 유사 내용 중복 제거
+ * - 최근 7일 발송분과 비교
+ * - 당일 수집분 내부 상호 비교 (최신 기사 우선 유지)
+ */
+function dedupeByUrlAndContent(
+  news: NewsItem[],
+  prior: PriorFingerprints,
+): { kept: NewsItem[]; removedUrl: number; removedSimilar: number } {
+  // 최신 기사 우선
+  const sorted = [...news].sort(
+    (a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+
+  const kept: NewsItem[] = [];
+  let removedUrl = 0;
+  let removedSimilar = 0;
+
+  for (const item of sorted) {
+    const nUrl = normalizeUrl(item.url);
+    if (prior.urls.has(item.url) || prior.urls.has(nUrl)) {
+      removedUrl++;
+      continue;
+    }
+    if (kept.some((k) => k.url === item.url || normalizeUrl(k.url) === nUrl)) {
+      removedUrl++;
+      continue;
+    }
+
+    // 최근 7일 발송 제목/한줄요약과 유사
+    const hitPrior = prior.texts.some((t) =>
+      isSimilarContent(item.title, item.summary, t, ""),
+    );
+    if (hitPrior) {
+      removedSimilar++;
+      console.log(`유사(7일내) 제외: ${item.title.slice(0, 40)}`);
+      continue;
+    }
+
+    // 당일 배치 내부 유사
+    const hitBatch = kept.some((k) =>
+      isSimilarContent(item.title, item.summary, k.title, k.summary),
+    );
+    if (hitBatch) {
+      removedSimilar++;
+      console.log(`유사(배치내) 제외: ${item.title.slice(0, 40)}`);
+      continue;
+    }
+
+    kept.push(item);
+  }
+
+  return { kept, removedUrl, removedSimilar };
+}
 
 async function fetchNaverNews(query: string, display: number): Promise<any[]> {
   const url =
@@ -230,10 +421,10 @@ async function fetchAllNews(interests: any[]): Promise<{
       continue;
     }
 
-    const byUrl = new Map<string, NewsItem>();
+    const bucket: NewsItem[] = [];
 
     try {
-      // 키워드별로 나눠 수집 후 URL 기준 합침 (관심사당 최대 display건)
+      // 키워드별로 나눠 수집 후 URL·유사내용 합침 (관심사당 최대 display건)
       const perKw = Math.min(
         100,
         Math.max(3, Math.ceil(display / keywords.length)),
@@ -244,12 +435,26 @@ async function fetchAllNews(interests: any[]): Promise<{
         for (const a of items) {
           if (!isFresh(a.pubDate, maxAgeMs)) continue;
           const articleUrl = a.originallink || a.link;
-          if (!articleUrl || byUrl.has(articleUrl)) continue;
-          byUrl.set(articleUrl, {
+          if (!articleUrl) continue;
+          const nUrl = normalizeUrl(articleUrl);
+          if (bucket.some((b) => b.url === articleUrl || normalizeUrl(b.url) === nUrl)) {
+            continue;
+          }
+          const title = stripHtml(a.title);
+          const summary = stripHtml(a.description);
+          // 같은 관심사 내 비슷한 제목/요약이면 스킵 (최신 우선이므로 이미 들어 있으면 유지)
+          if (
+            bucket.some((b) =>
+              isSimilarContent(title, summary, b.title, b.summary),
+            )
+          ) {
+            continue;
+          }
+          bucket.push({
             interestId: interest.id,
             category: label,
-            title: stripHtml(a.title),
-            summary: stripHtml(a.description),
+            title,
+            summary,
             url: articleUrl,
             publishedAt: a.pubDate,
           });
@@ -258,7 +463,7 @@ async function fetchAllNews(interests: any[]): Promise<{
       }
 
       // 최신순 정렬 후 관심사 후보 상한(extra)
-      const sorted = [...byUrl.values()].sort(
+      const sorted = bucket.sort(
         (a, b) =>
           new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
       );
@@ -715,10 +920,10 @@ Deno.serve(async (_req) => {
       }
     }
 
-    const [interests, emails, sentUrls] = await Promise.all([
+    const [interests, emails, priorFp] = await Promise.all([
       getInterests(),
       getEmails(),
-      getRecentlySentUrls(),
+      getRecentlySentFingerprints(),
     ]);
 
     console.log(`활성 관심사: ${interests.length}개`);
@@ -726,12 +931,16 @@ Deno.serve(async (_req) => {
     const { allNews, stats } = await fetchAllNews(interests);
     console.log("수집 뉴스(중복제거 전):", allNews.length);
 
-    const freshNews = allNews.filter((n) => !sentUrls.has(n.url));
+    const { kept: freshNews, removedUrl, removedSimilar } = dedupeByUrlAndContent(
+      allNews,
+      priorFp,
+    );
     console.log(
-      `7일 중복 제거 후: ${freshNews.length}건 (${allNews.length - freshNews.length}건 제외)`,
+      `중복 제거 후: ${freshNews.length}건 (URL ${removedUrl} + 유사내용 ${removedSimilar} 제외)`,
     );
 
     // 관심사당 브리핑 최대 3건 · 0건 관심사 생략
+    // (URL·유사내용 중복은 위에서 관심사 교차 포함 이미 제거됨)
     const forBriefing = capPerInterest(freshNews, BRIEFING_MAX_PER_INTEREST);
     console.log(
       `브리핑 확정: ${forBriefing.length}건 (관심사당 최대 ${BRIEFING_MAX_PER_INTEREST})`,
@@ -763,7 +972,8 @@ Deno.serve(async (_req) => {
         afterDedupe: freshNews.length,
         newsCount: forBriefing.length,
         maxPerInterest: BRIEFING_MAX_PER_INTEREST,
-        duplicatesRemoved: allNews.length - freshNews.length,
+        duplicatesRemoved: removedUrl + removedSimilar,
+        dedupe: { removedUrl, removedSimilar },
         preview: briefing.slice(0, 200),
       }),
       { headers: { "Content-Type": "application/json", ...CORS } },
