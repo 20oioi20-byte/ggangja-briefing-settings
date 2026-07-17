@@ -3,11 +3,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
-const NAVER_CLIENT_ID = Deno.env.get("NAVER_CLIENT_ID")!;
-const NAVER_CLIENT_SECRET = Deno.env.get("NAVER_CLIENT_SECRET")!;
+const NAVER_CLIENT_ID = Deno.env.get("NAVER_CLIENT_ID") || "";
+const NAVER_CLIENT_SECRET = Deno.env.get("NAVER_CLIENT_SECRET") || "";
 const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY")!;
 const KAKAO_REST_API_KEY = Deno.env.get("KAKAO_REST_API_KEY");
 const KAKAO_CLIENT_SECRET = Deno.env.get("KAKAO_CLIENT_SECRET");
+
+// NCP API Hub (NAVER API HUB) — KEY-ID + KEY
+// 시크릿 이름 호환: NCP_NAVER_API_KEY_ID / NCP_NAVER_API_KEY / NAVER_CLIENT_*
+const NCP_KEY_ID =
+  Deno.env.get("NCP_NAVER_API_KEY_ID") ||
+  Deno.env.get("NCP_CLIENT_ID") ||
+  Deno.env.get("NAVER_CLIENT_ID") ||
+  "";
+const NCP_KEY =
+  Deno.env.get("NCP_NAVER_API_KEY") ||
+  Deno.env.get("NCP_CLIENT_SECRET") ||
+  Deno.env.get("NAVER_CLIENT_SECRET") ||
+  "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
@@ -15,6 +28,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const BRIEFING_MAX_PER_INTEREST = 3;
 /** 최신 기사 허용 창 (시간). 24h는 아침 발송 시 0건이 잦아 48h로 완화 */
 const NEWS_MAX_AGE_HOURS = 48;
+
+/** 마지막 사용된 AI / 뉴스 API (히스토리 _provider 기록용) */
+let lastAIProvider = "Claude API";
+let lastNewsApiProvider = "naver";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -342,7 +359,150 @@ function dedupeByUrlAndContent(
   return { kept, removedUrl, removedSimilar };
 }
 
-async function fetchNaverNews(query: string, display: number): Promise<any[]> {
+// ══════════════════════════════════════════════
+// AI Provider: 서강대 MOT(GPT-5.5) → Claude Sonnet 4.6 → Gemini
+// ══════════════════════════════════════════════
+function resolveMotEndpoint(): { url: string; key: string } | null {
+  const MOT_URL =
+    Deno.env.get("MOT_GATEWAY_URL") || Deno.env.get("SOGANG_MOT_API_URL") || "";
+  const MOT_KEY =
+    Deno.env.get("MOT_GATEWAY_KEY") || Deno.env.get("SOGANG_MOT_API_KEY") || "";
+  if (!MOT_URL || !MOT_KEY) return null;
+  const endpoint = MOT_URL.includes("/chat/completions")
+    ? MOT_URL.trim()
+    : MOT_URL.includes("/v1/")
+      ? `${MOT_URL.trim().replace(/\/$/, "")}/chat/completions`
+      : `${MOT_URL.trim().replace(/\/$/, "")}/v1/chat/completions`;
+  return { url: endpoint, key: MOT_KEY };
+}
+
+async function callAI(
+  prompt: string,
+  maxTokens: number,
+  taskType = "news",
+): Promise<string> {
+  const model = taskType === "news" || taskType === "saju" || taskType === "keyword"
+    ? "gpt-5.5"
+    : "gpt-5.5";
+  const mot = resolveMotEndpoint();
+  const ANT_KEY = Deno.env.get("ANTHROPIC_API_KEY") || ANTHROPIC_API_KEY;
+  const GEM_KEY = Deno.env.get("GEMINI_API_KEY");
+
+  // 1) 서강대 MOT Gateway (GPT-5.5)
+  if (mot) {
+    try {
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 45000);
+      const res = await fetch(mot.url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${mot.key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: maxTokens,
+          temperature: 0.3,
+        }),
+        signal: ac.signal,
+      });
+      clearTimeout(t);
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content ?? "";
+        if (text.length > 10) {
+          lastAIProvider = `Gateway(${model})`;
+          console.log(`[AI] Gateway(${model}) 성공`);
+          return text;
+        }
+        console.log("[AI] Gateway 응답 비어있음 → Claude fallback");
+      } else {
+        const errBody = await res.text().catch(() => "");
+        console.log(
+          `[AI] Gateway HTTP ${res.status} → Claude | ${mot.url} | ${errBody.slice(0, 120)}`,
+        );
+      }
+    } catch (e) {
+      console.log(`[AI] Gateway 오류 → Claude: ${String(e).slice(0, 120)}`);
+    }
+  } else {
+    console.log("[AI] MOT Gateway 미설정 → Claude 사용");
+  }
+
+  // 2) Claude Sonnet 4.6
+  if (ANT_KEY) {
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANT_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: maxTokens,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        const text = data?.content?.[0]?.text ?? "";
+        if (text) {
+          lastAIProvider = "Claude API";
+          console.log("[AI] Claude 성공");
+          return text;
+        }
+      } else {
+        console.log(
+          `[AI] Claude 오류 → Gemini: ${data.error.message?.slice(0, 80)}`,
+        );
+      }
+    } catch (e) {
+      console.log(`[AI] Claude 오류 → Gemini: ${String(e).slice(0, 60)}`);
+    }
+  }
+
+  // 3) Gemini (최후)
+  if (GEM_KEY) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
+          }),
+        },
+      );
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (text) {
+        lastAIProvider = "Gemini";
+        console.log("[AI] Gemini fallback 성공");
+        return text;
+      }
+    } catch (e) {
+      console.log(`[AI] Gemini 오류: ${String(e).slice(0, 60)}`);
+    }
+  }
+
+  console.error(`[AI] 모든 Provider 실패 (${taskType})`);
+  return "";
+}
+
+/** 개발자센터 네이버 검색 API */
+async function fetchNaverDevelopersNews(
+  query: string,
+  display: number,
+): Promise<any[] | null> {
+  if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
+    console.error("네이버 Developers 키 미설정");
+    return null;
+  }
   const url =
     `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}` +
     `&display=${display}&sort=date`;
@@ -355,17 +515,112 @@ async function fetchNaverNews(query: string, display: number): Promise<any[]> {
   const json = await res.json();
   if (json.errorCode || json.errorMessage) {
     console.error(
-      `네이버 API 오류 [q=${query}]:`,
+      `네이버 Developers 오류 [q=${query}]:`,
       json.errorCode,
       json.errorMessage,
     );
-    return [];
+    return null;
   }
   if (!res.ok) {
-    console.error(`네이버 HTTP ${res.status} [q=${query}]:`, JSON.stringify(json).slice(0, 200));
-    return [];
+    console.error(
+      `네이버 Developers HTTP ${res.status}:`,
+      JSON.stringify(json).slice(0, 200),
+    );
+    return null;
   }
   return Array.isArray(json.items) ? json.items : [];
+}
+
+/**
+ * NCP NAVER API HUB 뉴스 검색
+ * GET https://naverapihub.apigw.ntruss.com/search/v1/news
+ * Headers: X-NCP-APIGW-API-KEY-ID / X-NCP-APIGW-API-KEY
+ */
+async function fetchNcpHubNews(
+  query: string,
+  display: number,
+): Promise<any[] | null> {
+  if (!NCP_KEY_ID || !NCP_KEY) {
+    console.error("NCP API Hub 키 미설정 (NCP_NAVER_API_KEY / KEY-ID)");
+    return null;
+  }
+  const url =
+    `https://naverapihub.apigw.ntruss.com/search/v1/news?query=${encodeURIComponent(query)}` +
+    `&display=${display}&start=1&sort=date&format=json`;
+  const res = await fetch(url, {
+    headers: {
+      "X-NCP-APIGW-API-KEY-ID": NCP_KEY_ID,
+      "X-NCP-APIGW-API-KEY": NCP_KEY,
+    },
+  });
+  const text = await res.text();
+  let json: any = {};
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    console.error(`NCP 응답 파싱 실패 HTTP ${res.status}:`, text.slice(0, 200));
+    return null;
+  }
+  if (!res.ok || json.error || json.errorCode || json.message) {
+    console.error(
+      `NCP API Hub 오류 [q=${query}] HTTP ${res.status}:`,
+      text.slice(0, 200),
+    );
+    return null;
+  }
+  if (!Array.isArray(json.items)) {
+    console.error("NCP 응답에 items 없음:", text.slice(0, 200));
+    return null;
+  }
+  return json.items;
+}
+
+/**
+ * 설정 news_api_provider 우선 + 오류 시 자동 폴백
+ * - ncp: NCP API Hub → 실패 시 네이버 Developers
+ * - naver: 네이버 Developers → 실패 시 NCP API Hub
+ */
+async function fetchNewsWithFallback(
+  query: string,
+  display: number,
+  preferred: "ncp" | "naver",
+): Promise<any[]> {
+  const order: Array<"ncp" | "naver"> =
+    preferred === "ncp" ? ["ncp", "naver"] : ["naver", "ncp"];
+
+  for (const prov of order) {
+    try {
+      const items =
+        prov === "ncp"
+          ? await fetchNcpHubNews(query, display)
+          : await fetchNaverDevelopersNews(query, display);
+      // null = 인증/HTTP 실패 → 다음 프로바이더. [] = 성공이지만 결과 없음.
+      if (items !== null) {
+        lastNewsApiProvider = prov;
+        if (prov !== preferred) {
+          console.log(
+            `[News] ${preferred} 실패 → ${prov} 폴백 성공 [q=${query}] ${items.length}건`,
+          );
+        } else {
+          console.log(`[News] ${prov} 성공 [q=${query}] ${items.length}건`);
+        }
+        return items;
+      }
+    } catch (e) {
+      console.error(`[News] ${prov} 예외:`, e);
+    }
+  }
+  console.error(`[News] 모든 뉴스 API 실패 [q=${query}]`);
+  return [];
+}
+
+/** @deprecated alias — 내부는 폴백 포함 fetch 사용 */
+async function fetchNaverNews(
+  query: string,
+  display: number,
+  preferred: "ncp" | "naver" = "ncp",
+): Promise<any[]> {
+  return fetchNewsWithFallback(query, display, preferred);
 }
 
 function isFresh(pubDate: string, maxAgeMs: number): boolean {
@@ -390,7 +645,10 @@ function stripHtml(s: string): string {
  * - extra → 네이버 display (관심사당 후보 상한)
  * - 빈 키워드·0건 관심사는 생략
  */
-async function fetchAllNews(interests: any[]): Promise<{
+async function fetchAllNews(
+  interests: any[],
+  preferredNewsApi: "ncp" | "naver" = "ncp",
+): Promise<{
   allNews: NewsItem[];
   stats: { label: string; keywords: string[]; requested: number; collected: number; skipped?: string }[];
 }> {
@@ -431,7 +689,7 @@ async function fetchAllNews(interests: any[]): Promise<{
       );
 
       for (const kw of keywords) {
-        const items = await fetchNaverNews(kw, perKw);
+        const items = await fetchNewsWithFallback(kw, perKw, preferredNewsApi);
         for (const a of items) {
           if (!isFresh(a.pubDate, maxAgeMs)) continue;
           const articleUrl = a.originallink || a.link;
@@ -562,26 +820,9 @@ ${JSON.stringify(payload, null, 2)}
 중요: 모든 문자열 값 안에서는 큰따옴표(")를 절대 쓰지 마세요. 강조가 필요하면 작은따옴표(')를 쓰세요.
 {"summary":"오늘의 핵심 요약 3줄 이내 줄바꿈은 \\n","news":[{"category":"카테고리명","title":"기사제목","url":"기사URL","oneline":"한줄요약"}],"insight":"오늘 주목할 점 1~2가지 줄바꿈은 \\n"}`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4000,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  const data = await res.json();
-  if (data?.error) {
-    console.error("Claude API 오류:", JSON.stringify(data.error));
-  }
-  const text = data?.content?.[0]?.text ?? "";
-  console.log("Claude 응답 앞100자:", text.slice(0, 100));
+  // MOT GPT-5.5 → Claude 4.6 → Gemini
+  const text = await callAI(prompt, 4000, "news");
+  console.log("AI 응답 앞100자:", (text || "").slice(0, 100), "| provider:", lastAIProvider);
   return text;
 }
 
@@ -840,18 +1081,42 @@ async function sendKakao(briefingText: string, refreshToken: string | null) {
   console.log("카카오 발송 결과:", JSON.stringify(result));
 }
 
+function attachMetaToBriefing(briefingText: string): string {
+  // 히스토리 UI가 content._provider 를 읽음
+  try {
+    const parsed = parseBriefing(briefingText);
+    if (parsed && typeof parsed === "object") {
+      parsed._provider = lastAIProvider;
+      parsed._news_api = lastNewsApiProvider;
+      parsed._type = "news";
+      return JSON.stringify(parsed);
+    }
+  } catch {}
+  // 파싱 실패 시 래핑
+  return JSON.stringify({
+    _provider: lastAIProvider,
+    _news_api: lastNewsApiProvider,
+    _type: "news",
+    summary: briefingText.slice(0, 500),
+    news: [],
+    insight: "",
+    raw: briefingText,
+  });
+}
+
 async function saveBriefing(briefingText: string, dateStr: string) {
+  const content = attachMetaToBriefing(briefingText);
   await supabase.from("briefings").delete().eq("date", dateStr).eq("channel", "email+kakao");
   // channel 필터 delete가 스키마에 안 맞을 수 있어 기존 방식도 유지
   await supabase.from("briefings").delete().eq("date", dateStr);
   const { error } = await supabase.from("briefings").insert({
     date: dateStr,
-    content: briefingText,
+    content,
     sent_at: new Date().toISOString(),
     channel: "email+kakao",
   });
   if (error) console.error("briefings 저장 실패:", JSON.stringify(error));
-  else console.log("briefings 저장 완료:", dateStr);
+  else console.log("briefings 저장 완료:", dateStr, lastAIProvider, lastNewsApiProvider);
 }
 
 /** 수집 0건이어도 발송 가능한 최소 브리핑 JSON */
@@ -928,7 +1193,12 @@ Deno.serve(async (_req) => {
 
     console.log(`활성 관심사: ${interests.length}개`);
 
-    const { allNews, stats } = await fetchAllNews(interests);
+    // UI 설정: news_api_provider = ncp | naver (기본 ncp, 오류 시 자동 폴백)
+    const rawProv = String(settings["news_api_provider"] || "ncp").toLowerCase();
+    const preferredNewsApi: "ncp" | "naver" = rawProv === "naver" ? "naver" : "ncp";
+    console.log(`뉴스 API 우선: ${preferredNewsApi} (NCP키:${NCP_KEY_ID ? "Y" : "N"}/${NCP_KEY ? "Y" : "N"}, 네이버Dev:${NAVER_CLIENT_ID ? "Y" : "N"})`);
+
+    const { allNews, stats } = await fetchAllNews(interests, preferredNewsApi);
     console.log("수집 뉴스(중복제거 전):", allNews.length);
 
     const { kept: freshNews, removedUrl, removedSimilar } = dedupeByUrlAndContent(
@@ -974,6 +1244,9 @@ Deno.serve(async (_req) => {
         maxPerInterest: BRIEFING_MAX_PER_INTEREST,
         duplicatesRemoved: removedUrl + removedSimilar,
         dedupe: { removedUrl, removedSimilar },
+        preferredNewsApi,
+        newsApiUsed: lastNewsApiProvider,
+        aiProvider: lastAIProvider,
         preview: briefing.slice(0, 200),
       }),
       { headers: { "Content-Type": "application/json", ...CORS } },

@@ -642,7 +642,7 @@ function BriefingSection({db,title,emoji,prefix,invokeName}){
   const[loading,setLoading]=useState(true);
   const[saving,setSaving]=useState(false);
   const[sending,setSending]=useState(false);
-  const[newsApi,setNewsApi]=useState('naver');  // 뉴스 API 선택 (news prefix만)
+  const[newsApi,setNewsApi]=useState('ncp');  // 뉴스 API 선택: ncp 기본, 오류 시 네이버 폴백
   const[toast,toastEl]=useToast();
 
   useEffect(()=>{
@@ -714,22 +714,28 @@ function BriefingSection({db,title,emoji,prefix,invokeName}){
     ),
     toastEl,
     prefix==='news'&&h('div',{style:'margin-bottom:14px'},
-      h('div',{style:'font-size:12px;color:var(--txt2);font-weight:600;margin-bottom:6px'},'뉴스 수집 API'),
-      h('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},
-        [['naver','🔵 네이버 API (현재)'],['ncp','🟢 NCP API Hub']].map(([v,label])=>
+      h('div',{style:'font-size:12px;color:var(--txt2);font-weight:600;margin-bottom:6px'},'뉴스 수집 API (우선)'),
+      h('div',{style:'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px'},
+        [['ncp','🟢 NCP API Hub (기본)'],['naver','🔵 네이버 Developers']].map(([v,label])=>
           h('label',{key:v,
             style:`display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 14px;border-radius:999px;border:1px solid ${newsApi===v?'var(--acc)':'var(--brd)'};background:${newsApi===v?'rgba(0,113,227,.15)':'transparent'}`},
             h('input',{type:'radio',name:'newsApiProv',value:v,checked:newsApi===v,style:'display:none',
               onChange:async()=>{
                 setNewsApi(v);
-                try{await db.setSetting('news_api_provider',v);toast(v==='ncp'?'NCP API Hub 기본으로 설정':'네이버 API 기본으로 설정');}
+                try{await db.setSetting('news_api_provider',v);toast(v==='ncp'?'NCP API Hub 우선 · 실패 시 네이버':'네이버 우선 · 실패 시 NCP');}
                 catch(e){toast(e.message,'err');}
               }}),
             h('span',{style:`font-size:12px;font-weight:600;color:${newsApi===v?'var(--acc)':'var(--txt2)'}`},label)
           )
         )
-      )
+      ),
+      h('div',{style:'font-size:11px;color:var(--txt3);line-height:1.5'},
+        '선택 API 오류 시 자동으로 다른 쪽으로 폴백합니다. 분석 AI: 서강대 MOT(GPT-5.5) → 실패 시 Claude Sonnet 4.6')
     ),
+    prefix==='youtube'&&h('div',{style:'margin-bottom:12px;font-size:11px;color:var(--txt3);line-height:1.5'},
+      '분석 AI: 서강대 MOT(Gemini) → 실패 시 Gemini API'),
+    prefix==='saju'&&h('div',{style:'margin-bottom:12px;font-size:11px;color:var(--txt3);line-height:1.5'},
+      '분석 AI: 서강대 MOT(GPT-5.5) → 실패 시 Claude Sonnet 4.6'),
     h('div',{style:'margin-bottom:12px'},
       h('div',{style:'font-size:12px;color:var(--txt2);font-weight:600;margin-bottom:6px'},'발송 시각'),
       h('div',{style:'display:flex;gap:6px;align-items:center;margin-bottom:8px'},
