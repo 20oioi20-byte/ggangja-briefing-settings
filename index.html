@@ -126,6 +126,8 @@ import{useState,useEffect,useCallback,useRef}from'https://esm.sh/preact@10.19.3/
 /* ── 상수 ── */
 const SUPA_URL='https://zbiwyqwjehnogxkzlhxx.supabase.co';
 const KEY_LS='ggangja_anon_key';
+// Supabase anon key (공개용 키, RLS로 접근을 제한하는 게 원칙 - 비밀키 아님). 기기마다 다시 입력할 필요 없도록 기본값으로 내장.
+const DEFAULT_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiaXd5cXdqZWhub2d4a3psaHh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwOTQ1MzYsImV4cCI6MjA5NjY3MDUzNn0.SQJjHnDcMTRyElxtY9E-04yIkzPVF35L8hcx0lSyG48';
 const DAYS_KR=['월','화','수','목','금','토','일'];
 // DB에 숫자 배열 [1,2,3,4,5] 로 저장됨 (1=월 ~ 7=일)
 const DAY_NUMS=[1,2,3,4,5,6,7];
@@ -1413,7 +1415,7 @@ function KeySetup({onSave}){
 
 /* ── App ── */
 function App(){
-  const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||'');
+  const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||DEFAULT_ANON_KEY);
   const[tab,setTab]=useState(0);
   const db=key?mkDB(key):null;
   const TABS=['관심사','수신자','발송 설정','히스토리','유튜브','사주','카톡','파일함'];
