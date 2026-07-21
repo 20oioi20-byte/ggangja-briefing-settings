@@ -252,14 +252,18 @@ const BAD_SIGNALS = [
   "시청할 수 없", "볼 수 없", "직접 확인할 수 없", "링크가 제공되지",
   "죄송", "저는 텍스트", "영상을 직접", "요약 틀을 제공", "일반적으로",
   "실제 영상", "정확한 내용은", "알 수 없습니다", "모르겠습니다",
-  "어떤 영상인지", "영상에 대한", "제공하지 않",
+  "어떤 영상인지", "영상에 대한", "제공하지 않", "확인할 수 없",
+  "구체적인 내용을", "붙여넣기", "스크립트를 제공", "형식 기준으로",
 ];
 
 // ── 영상 분석: 1) 자막/설명 기반 MOT Gemini → Gemini API  2) 멀티모달 Gemini 직행 ──
 async function analyzeVideo(video: any): Promise<{ summary: string; ok: boolean; failReason?: string }> {
   // 1순위: 텍스트 경로 (MOT Gemini → Gemini API) — 설계 기본값
   const textFirst = await analyzeVideoByText(video);
-  if (textFirst.ok && textFirst.summary) return textFirst;
+  // 자막(원문) 기반으로 성공한 경우에만 그대로 채택 — 근거가 탄탄하고 저렴함
+  if (textFirst.ok && textFirst.summary && textFirst.usedCaption) return textFirst;
+  // 자막이 없어 설명(짧은 텍스트)만으로 만든 요약은 품질이 낮을 수 있으므로,
+  // 아래 멀티모달 경로로 영상을 직접 분석해 더 정확한 결과를 우선 시도한다.
 
   // 2순위: Gemini API 멀티모달 직접 (YouTube URL)
   const getErrMsg = (data: any): string => {
@@ -284,7 +288,7 @@ async function analyzeVideo(video: any): Promise<{ summary: string; ok: boolean;
             {
               parts: [
                 {
-                  text: "이 유튜브 영상을 한국어로 핵심만 5~7줄로 요약해줘. 투자/경제/업무 관점에서 중요한 포인트 위주로. 불필요한 인사말 없이 바로 요약 내용만.",
+                  text: "이 유튜브 영상을 한국어로 핵심만 5~7줄로 요약해줘. 투자/경제/업무 관점에서 중요한 포인트 위주로. 불필요한 인사말 없이 바로 요약 내용만. 마크다운(#, **, |, - 등) 사용 금지, 일반 텍스트로만 작성.",
                 },
                 { file_data: { file_uri: video.url } },
               ],
@@ -341,7 +345,7 @@ async function analyzeVideo(video: any): Promise<{ summary: string; ok: boolean;
 }
 
 // ── 자막/설명 기반: MOT Gemini → Gemini API ──
-async function analyzeVideoByText(video: any): Promise<{ summary: string; ok: boolean; failReason?: string }> {
+async function analyzeVideoByText(video: any): Promise<{ summary: string; ok: boolean; failReason?: string; usedCaption?: boolean }> {
   // 자막 추출 시도
   let contextText = "";
   try {
@@ -376,18 +380,19 @@ async function analyzeVideoByText(video: any): Promise<{ summary: string; ok: bo
     contextText = desc;
   }
 
-  const prompt = contextText.length > 500
-    ? `다음은 유튜브 영상 "${video.title}"의 자막 전문입니다. 투자/경제/업무 관점에서 핵심만 5~7줄로 요약해줘. 인사말 없이 바로 요약만.\n\n${contextText.slice(0, 6000)}`
-    : `아래는 유튜브 영상의 제목과 설명입니다. 투자/경제/업무 관점에서 3~5줄로 요약해줘. 인사말 없이 바로 요약만.\n\n${contextText}`;
+  const usedCaption = contextText.length > 500;
+  const prompt = usedCaption
+    ? `다음은 유튜브 영상 "${video.title}"의 자막 전문입니다. 투자/경제/업무 관점에서 핵심만 5~7줄로 요약해줘. 인사말 없이 바로 요약만. 마크다운(#, **, |, - 등) 사용 금지, 일반 텍스트로만 작성.\n\n${contextText.slice(0, 6000)}`
+    : `아래는 유튜브 영상의 제목과 설명입니다. 투자/경제/업무 관점에서 3~5줄로 요약해줘. 인사말 없이 바로 요약만. 정보가 부족해도 추측 가능한 범위에서 핵심 내용을 요약하고, "확인할 수 없다"거나 스크립트를 붙여달라는 식의 답변은 하지 마. 마크다운(#, **, |, - 등) 사용 금지, 일반 텍스트로만 작성.\n\n${contextText}`;
 
   const resultText = await callYoutubeTextAI(prompt);
 
   if (resultText && resultText.length > 30 && !BAD_SIGNALS.some(s => resultText.includes(s))) {
-    const note = contextText.length > 500 ? '' : '\n\n※ 영상 직접 분석이 어려워 영상 설명 기반으로 요약했습니다.';
-    return { summary: resultText + note, ok: true };
+    const note = usedCaption ? '' : '\n\n※ 영상 직접 분석이 어려워 영상 설명 기반으로 요약했습니다.';
+    return { summary: resultText + note, ok: true, usedCaption };
   }
 
-  return { summary: '', ok: false, failReason: '영상 직접 분석 불가 (저작권 보호 또는 라이브 영상)' };
+  return { summary: '', ok: false, failReason: '영상 직접 분석 불가 (저작권 보호 또는 라이브 영상)', usedCaption };
 }
 
 // ── 메일 HTML (분석 성공/실패 구분) ──
@@ -507,16 +512,27 @@ async function runBriefing(force: boolean): Promise<{ videosSent: number; videos
   const sentVideos: string[] = [];
 
   for (const channel of channels) {
-    const newVideos = await getNewVideos(channel);
+    let newVideos: any[] = [];
+    try {
+      newVideos = await getNewVideos(channel);
+    } catch (e) {
+      console.error(`채널 조회 실패 (${channel.channel_title}):`, String(e).slice(0, 150));
+      continue;
+    }
+    // 한 영상 처리 중 오류가 나도 나머지 영상/채널은 계속 진행되도록 독립적으로 처리
     for (const video of newVideos) {
-      const { summary, ok, failReason } = await analyzeVideo(video);
-      await Promise.all([
-        sendEmail(video, summary, ok, emails, failReason),
-        sendKakao(video, summary, ok, kakaoToken, failReason),
-      ]);
-      await markSent(video);
-      totalSent++;
-      sentVideos.push(`${channel.channel_title}: ${video.title} ${ok ? '(요약O)' : '(링크만)'}`);
+      try {
+        const { summary, ok, failReason } = await analyzeVideo(video);
+        await Promise.all([
+          sendEmail(video, summary, ok, emails, failReason),
+          sendKakao(video, summary, ok, kakaoToken, failReason),
+        ]);
+        await markSent(video);
+        totalSent++;
+        sentVideos.push(`${channel.channel_title}: ${video.title} ${ok ? '(요약O)' : '(링크만)'}`);
+      } catch (e) {
+        console.error(`영상 처리 실패 (${channel.channel_title}: ${video.title}):`, String(e).slice(0, 150));
+      }
     }
   }
   // 히스토리 저장
