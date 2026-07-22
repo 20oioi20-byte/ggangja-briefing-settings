@@ -256,16 +256,24 @@ const BAD_SIGNALS = [
   "구체적인 내용을", "붙여넣기", "스크립트를 제공", "형식 기준으로",
 ];
 
-// ── 영상 분석: 1) 자막/설명 기반 MOT Gemini → Gemini API  2) 멀티모달 Gemini 직행 ──
+// ── 영상 분석: 1) 멀티모달 Gemini로 영상 자체를 직접 분석  2) 실패 시 자막/설명 기반 텍스트 분석 ──
 async function analyzeVideo(video: any): Promise<{ summary: string; ok: boolean; failReason?: string }> {
-  // 1순위: 텍스트 경로 (MOT Gemini → Gemini API) — 설계 기본값
-  const textFirst = await analyzeVideoByText(video);
-  // 자막(원문) 기반으로 성공한 경우에만 그대로 채택 — 근거가 탄탄하고 저렴함
-  if (textFirst.ok && textFirst.summary && textFirst.usedCaption) return textFirst;
-  // 자막이 없어 설명(짧은 텍스트)만으로 만든 요약은 품질이 낮을 수 있으므로,
-  // 아래 멀티모달 경로로 영상을 직접 분석해 더 정확한 결과를 우선 시도한다.
+  const direct = await analyzeVideoMultimodal(video);
+  if (direct.ok && direct.summary) return direct;
 
-  // 2순위: Gemini API 멀티모달 직접 (YouTube URL)
+  // 영상 직접 분석 실패(할당량 초과, 오류 등) 시 자막/설명 기반으로 폴백
+  const textFallback = await analyzeVideoByText(video);
+  if (textFallback.ok && textFallback.summary) return textFallback;
+
+  return {
+    summary: "",
+    ok: false,
+    failReason: direct.failReason || textFallback.failReason || "영상 분석 불가",
+  };
+}
+
+// ── Gemini API 멀티모달 직접 분석 (YouTube URL) ──
+async function analyzeVideoMultimodal(video: any): Promise<{ summary: string; ok: boolean; failReason?: string }> {
   const getErrMsg = (data: any): string => {
     if (!data?.error) return "";
     const msg = data.error.message || "";
@@ -303,28 +311,18 @@ async function analyzeVideo(video: any): Promise<{ summary: string; ok: boolean;
     if (data.error) {
       const reason = getErrMsg(data);
       console.log(`Gemini 멀티모달 오류 (${video.title}): ${reason}`);
-      return {
-        summary: "",
-        ok: false,
-        failReason: textFirst.failReason || reason,
-      };
+      return { summary: "", ok: false, failReason: reason };
     }
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     if (!text) {
-      return {
-        summary: "",
-        ok: false,
-        failReason: textFirst.failReason || "응답 없음",
-      };
+      return { summary: "", ok: false, failReason: "응답 없음" };
     }
 
     const isFake = BAD_SIGNALS.some((sig) => text.includes(sig));
     if (isFake) {
-      console.log(`가짜요약 감지 (${video.title}) — 텍스트 경로 결과 사용`);
-      return textFirst.ok
-        ? textFirst
-        : { summary: "", ok: false, failReason: "분석 불가 (가짜 요약)" };
+      console.log(`가짜요약 감지 (${video.title}) — 자막/설명 경로로 폴백`);
+      return { summary: "", ok: false, failReason: "분석 불가 (가짜 요약)" };
     }
 
     lastYtProvider = "Gemini API";
@@ -334,13 +332,7 @@ async function analyzeVideo(video: any): Promise<{ summary: string; ok: boolean;
       `Gemini 멀티모달 예외 (${video.title}):`,
       String(e).slice(0, 50),
     );
-    return textFirst.ok
-      ? textFirst
-      : {
-          summary: "",
-          ok: false,
-          failReason: textFirst.failReason || String(e).slice(0, 80),
-        };
+    return { summary: "", ok: false, failReason: String(e).slice(0, 80) };
   }
 }
 
