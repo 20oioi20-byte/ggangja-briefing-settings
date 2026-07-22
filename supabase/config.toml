@@ -4,3 +4,9 @@ project_id = "zbiwyqwjehnogxkzlhxx"
 
 [functions.daily-briefing]
 verify_jwt = false
+
+[functions.briefing-auth]
+verify_jwt = false
+
+[functions.briefing-api]
+verify_jwt = false

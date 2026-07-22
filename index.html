@@ -125,9 +125,10 @@ import{useState,useEffect,useCallback,useRef}from'https://esm.sh/preact@10.19.3/
 
 /* ── 상수 ── */
 const SUPA_URL='https://zbiwyqwjehnogxkzlhxx.supabase.co';
-const KEY_LS='ggangja_anon_key';
-// Supabase anon key (공개용 키, RLS로 접근을 제한하는 게 원칙 - 비밀키 아님). 기기마다 다시 입력할 필요 없도록 기본값으로 내장.
+// Supabase anon key: Edge Function 호출용 게이트웨이 인증 헤더로만 쓰임 (공개용 키, 비밀키 아님).
+// 실제 데이터 접근 권한은 이 키가 아니라 접속 비밀번호로 발급되는 세션 토큰(SESSION_LS)이 담당합니다.
 const DEFAULT_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiaXd5cXdqZWhub2d4a3psaHh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwOTQ1MzYsImV4cCI6MjA5NjY3MDUzNn0.SQJjHnDcMTRyElxtY9E-04yIkzPVF35L8hcx0lSyG48';
+const SESSION_LS='ggangja_briefing_session';
 const DAYS_KR=['월','화','수','목','금','토','일'];
 // DB에 숫자 배열 [1,2,3,4,5] 로 저장됨 (1=월 ~ 7=일)
 const DAY_NUMS=[1,2,3,4,5,6,7];
@@ -163,52 +164,47 @@ function fmtDate(ts){
 function p2(n){return String(n).padStart(2,'0')}
 
 /* ── Supabase 클라이언트 (순수 fetch) ── */
-function mkDB(key){
-  const H={apikey:key,'Authorization':'Bearer '+key,'Content-Type':'application/json'};
-  const B=SUPA_URL+'/rest/v1';
-
-  async function req(path,opts={}){
-    const res=await fetch(B+path,{headers:H,...opts});
+// settings/briefing_interests/briefings/saju_members/youtube_channels 테이블과 kakao-files 스토리지는
+// 브라우저에서 anon key로 직접 REST/Storage 호출하지 않고, 비밀번호 세션 토큰이 있어야 통과되는
+// briefing-api Edge Function을 경유합니다 (서버에서 service_role key로 처리).
+function mkDB(key,sessionToken){
+  async function api(resource,action,extra={}){
+    const res=await fetch(`${SUPA_URL}/functions/v1/briefing-api`,{
+      method:'POST',
+      headers:{Authorization:'Bearer '+key,'X-Briefing-Token':sessionToken||'','Content-Type':'application/json'},
+      body:JSON.stringify({resource,action,...extra})
+    });
     const txt=await res.text();
+    if(res.status===401){
+      localStorage.removeItem(SESSION_LS);
+      location.reload();
+      throw new Error('세션이 만료되어 다시 로그인해야 합니다');
+    }
     if(!res.ok)throw new Error(txt||res.statusText);
-    return txt?JSON.parse(txt):[];
+    return txt?JSON.parse(txt):null;
   }
 
   return{
     async getInterests(){
-      return req('/briefing_interests?order=sort_order.asc,id.asc');
+      return api('interests','list');
     },
     async addInterest(d){
-      return req('/briefing_interests',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      return api('interests','create',{data:d});
     },
     async updateInterest(id,d){
-      return req(`/briefing_interests?id=eq.${id}`,{method:'PATCH',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      return api('interests','update',{id,data:d});
     },
     async deleteInterest(id){
-      return req(`/briefing_interests?id=eq.${id}`,{method:'DELETE'});
+      return api('interests','delete',{id});
     },
     async getSettings(){
-      const rows=await req('/settings');
-      const m={};
-      rows.forEach(r=>{m[r.key]=r.value;});
-      return m;
+      return api('settings','get');
     },
     async setSetting(key,value){
-      // PATCH 먼저, 없으면 INSERT
-      const patch=await fetch(`${B}/settings?key=eq.${key}`,{
-        method:'PATCH',headers:{...H,Prefer:'return=representation'},
-        body:JSON.stringify({value})
-      });
-      const ptxt=await patch.text();
-      const pdata=ptxt?JSON.parse(ptxt):[];
-      if(!patch.ok)throw new Error(ptxt);
-      if(Array.isArray(pdata)&&pdata.length===0){
-        return req('/settings',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify({key,value})});
-      }
+      return api('settings','set',{key,value});
     },
     async getBriefings(){
-      // 컬럼명 불확실 → select * + id desc
-      return req('/briefings?order=sent_at.desc,id.desc&limit=60&select=id,date,sent_at,channel,content');
+      return api('briefings','list');
     },
     async invoke(fn){
       const res=await fetch(`${SUPA_URL}/functions/v1/${fn}?force=true`,{
@@ -220,16 +216,16 @@ function mkDB(key){
       return txt?JSON.parse(txt):{};
     },
     async getChannels(){
-      return req('/youtube_channels?order=sort_order.asc,created_at.asc');
+      return api('channels','list');
     },
     async addChannel(d){
-      return req('/youtube_channels',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      return api('channels','create',{data:d});
     },
     async updateChannel(id,d){
-      return req(`/youtube_channels?id=eq.${id}`,{method:'PATCH',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      return api('channels','update',{id,data:d});
     },
     async deleteChannel(id){
-      return req(`/youtube_channels?id=eq.${id}`,{method:'DELETE'});
+      return api('channels','delete',{id});
     },
     async resolveYoutubeChannel(input){
       // @핸들 / youtube.com/@핸들 / youtube.com/channel/UC... / 채널ID 모두 지원
@@ -264,16 +260,16 @@ function mkDB(key){
       };
     },
     async getMembers(){
-      return req('/saju_members?order=sort_order.asc,created_at.asc');
+      return api('members','list');
     },
     async addMember(d){
-      return req('/saju_members',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      return api('members','create',{data:d});
     },
     async updateMember(id,d){
-      return req(`/saju_members?id=eq.${id}`,{method:'PATCH',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      return api('members','update',{id,data:d});
     },
     async deleteMember(id){
-      return req(`/saju_members?id=eq.${id}`,{method:'DELETE'});
+      return api('members','delete',{id});
     },
     async invokeSaju(){
       const res=await fetch(`${SUPA_URL}/functions/v1/saju-briefing?force=true`,{
@@ -326,35 +322,19 @@ function mkDB(key){
       return txt?JSON.parse(txt):{};
     },
     async kakaoSendFile(file){
-      // Supabase Storage 업로드 후 링크 발송
+      // Storage 업로드(서버 경유) 후 링크 발송
       const fname=`${Date.now()}_${file.name}`;
-      const uploadRes=await fetch(`${SUPA_URL}/storage/v1/object/kakao-files/${fname}`,{
-        method:'POST',
-        headers:{Authorization:'Bearer '+key,'Content-Type':file.type||'application/octet-stream'},
-        body:file
-      });
-      if(!uploadRes.ok){const t=await uploadRes.text();throw new Error('파일 업로드 실패: '+t);}
-      const fileUrl=`${SUPA_URL}/storage/v1/object/public/kakao-files/${fname}`;
+      const buf=await file.arrayBuffer();
+      const base64=btoa(new Uint8Array(buf).reduce((s,b)=>s+String.fromCharCode(b),''));
+      const {publicUrl}=await api('storage','upload',{fname,contentType:file.type||'application/octet-stream',base64});
       // 링크로 카톡 발송
-      return this.kakaoSendLink(file.name,fileUrl,`파일 크기: ${(file.size/1024).toFixed(1)}KB`);
+      return this.kakaoSendLink(file.name,publicUrl,`파일 크기: ${(file.size/1024).toFixed(1)}KB`);
     },
     async listFiles(){
-      const res=await fetch(`${SUPA_URL}/storage/v1/object/list/kakao-files`,{
-        method:'POST',
-        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
-        body:JSON.stringify({prefix:'',limit:200,offset:0,sortBy:{column:'created_at',order:'desc'}})
-      });
-      if(!res.ok)throw new Error(await res.text());
-      return await res.json();
+      return api('storage','list');
     },
     async deleteFile(name){
-      const res=await fetch(`${SUPA_URL}/storage/v1/object/kakao-files`,{
-        method:'DELETE',
-        headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
-        body:JSON.stringify({prefixes:[name]})
-      });
-      if(!res.ok)throw new Error(await res.text());
-      return await res.json();
+      return api('storage','delete',{name});
     },
     async suggestKeyword(label){
       const res=await fetch(`${SUPA_URL}/functions/v1/keyword-suggest`,{
@@ -1399,28 +1379,53 @@ function TabFiles({db}){
   );
 }
 
-/* ── Key Setup ── */
-function KeySetup({onSave}){
+/* ── 접속 비밀번호 화면 ── */
+function PasswordGate({onSave}){
   const[v,setV]=useState('');
-  const go=()=>{if(v.startsWith('eyJ')){localStorage.setItem(KEY_LS,v.trim());onSave(v.trim());}};
+  const[err,setErr]=useState('');
+  const[busy,setBusy]=useState(false);
+  const go=async()=>{
+    if(!v.trim())return;
+    setBusy(true);setErr('');
+    try{
+      const res=await fetch(`${SUPA_URL}/functions/v1/briefing-auth`,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+DEFAULT_ANON_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({password:v.trim()})
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||'로그인 실패');
+      localStorage.setItem(SESSION_LS,JSON.stringify(data));
+      onSave(data.token);
+    }catch(e){setErr(e.message);}
+    finally{setBusy(false);}
+  };
   return h('div',{class:'key-wrap'},
     h('div',{class:'key-box'},
       h('h1',null,'깡자동 브리핑'),
-      h('p',null,'Supabase Anon Key를 입력하여 시작하세요'),
-      h('input',{placeholder:'eyJhbGci...',value:v,onInput:e=>setV(e.target.value),onKeyDown:e=>e.key==='Enter'&&go()}),
-      h('button',{class:'btn btn-p',style:'width:100%',onClick:go},'연결하기')
+      h('p',null,'접속 비밀번호를 입력하세요'),
+      h('input',{type:'password',placeholder:'비밀번호',value:v,onInput:e=>setV(e.target.value),onKeyDown:e=>e.key==='Enter'&&go()}),
+      err&&h('p',{style:'color:var(--red);font-size:12px;margin:-4px 0 12px'},err),
+      h('button',{class:'btn btn-p',style:'width:100%',disabled:busy,onClick:go},busy?'확인 중...':'입장하기')
     )
   );
 }
 
 /* ── App ── */
 function App(){
-  const[key,setKey]=useState(()=>localStorage.getItem(KEY_LS)||DEFAULT_ANON_KEY);
+  const key=DEFAULT_ANON_KEY;
+  const[session,setSession]=useState(()=>{
+    try{
+      const s=JSON.parse(localStorage.getItem(SESSION_LS)||'null');
+      if(s&&s.token&&s.exp>Date.now())return s;
+    }catch{}
+    return null;
+  });
   const[tab,setTab]=useState(0);
-  const db=key?mkDB(key):null;
+  const db=session?mkDB(key,session.token):null;
   const TABS=['관심사','수신자','발송 설정','히스토리','유튜브','사주','카톡','파일함'];
 
-  if(!key)return h(KeySetup,{onSave:setKey});
+  if(!session)return h(PasswordGate,{onSave:token=>setSession({token})});
 
   return h(Fragment,null,
     h('div',{class:'hdr'},
@@ -1429,8 +1434,8 @@ function App(){
         h('div',{class:'logo'},'깡자동 브리핑',h('small',null,'설정 관리'))
       ),
       h('button',{class:'btn btn-s btn-sm',onClick:()=>{
-        if(confirm('연결을 초기화하시겠습니까?')){localStorage.removeItem(KEY_LS);setKey('');}
-      }},'키 초기화')
+        if(confirm('로그아웃하시겠습니까?')){localStorage.removeItem(SESSION_LS);setSession(null);}
+      }},'로그아웃')
     ),
     h('div',{class:'tabs'},TABS.map((t,i)=>
       h('button',{class:`tab${tab===i?' on':''}`,onClick:()=>setTab(i)},t)
