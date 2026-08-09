@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Lunar from "https://esm.sh/lunar-javascript@1.7.7";
+import { sendMail } from "../_shared/mail.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -89,7 +90,6 @@ async function callAI(prompt: string, maxTokens: number, taskType = 'general'): 
   console.error(`[AI] 모든 Provider 실패 (${taskType})`); return "";
 }
 
-const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY")!;
 const KAKAO_REST_API_KEY = Deno.env.get("KAKAO_REST_API_KEY");
 const KAKAO_CLIENT_SECRET = Deno.env.get("KAKAO_CLIENT_SECRET");
 
@@ -241,21 +241,9 @@ async function refreshKakaoToken(refreshToken: string): Promise<string | null> {
 
 async function sendEmail(member: any, annualText: string, year: number, emails: string[]) {
   const html = buildAnnualHtml(member, annualText, year);
-  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SENDGRID_API_KEY}` },
-    body: JSON.stringify({
-      personalizations: [{ to: emails.filter(Boolean).map(email => ({ email })) }],
-      from: { email: "20oioi20@gmail.com", name: "깡자동 AI비서" },
-      subject: `[깡자동 연간운세] ${year}년 ${member.name} 토종비결`,
-      content: [{ type: "text/html", value: html }],
-    }),
-  });
-  console.log(`연간운세 메일 (${member.name}):`, res.status);
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`SendGrid 실패 (${member.name}): HTTP ${res.status} ${errBody.slice(0, 150)}`);
-  }
+  // sendMail이 실패 시 예외를 던지므로 그대로 전파 (runAnnual의 구성원별 try/catch에서 처리)
+  await sendMail(emails.filter(Boolean), `[깡자동 연간운세] ${year}년 ${member.name} 토종비결`, html);
+  console.log(`연간운세 메일 발송 성공 (${member.name})`);
 }
 
 async function sendKakao(member: any, annualText: string, year: number, accessToken: string | null) {

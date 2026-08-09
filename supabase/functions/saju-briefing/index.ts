@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Lunar from "https://esm.sh/lunar-javascript@1.7.7";
+import { sendMail } from "../_shared/mail.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -89,7 +90,6 @@ async function callAI(prompt: string, maxTokens: number, taskType = 'general'): 
   console.error(`[AI] 모든 Provider 실패 (${taskType})`); return "";
 }
 
-const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY")!;
 const KAKAO_REST_API_KEY = Deno.env.get("KAKAO_REST_API_KEY");
 const KAKAO_CLIENT_SECRET = Deno.env.get("KAKAO_CLIENT_SECRET");
 
@@ -311,17 +311,12 @@ function buildSajuHtml(membersResult: any[], today: string): string {
 
 async function sendEmail(membersResult: any[], today: string, emails: string[]) {
   const html = buildSajuHtml(membersResult, today);
-  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SENDGRID_API_KEY}` },
-    body: JSON.stringify({
-      personalizations: [{ to: emails.filter(Boolean).map(email => ({ email })) }],
-      from: { email: "20oioi20@gmail.com", name: "깡자동 AI비서" },
-      subject: `[깡자동 사주] ${today} 가족 일일운세`,
-      content: [{ type: "text/html", value: html }],
-    }),
-  });
-  console.log("사주 메일 발송:", res.status);
+  try {
+    await sendMail(emails.filter(Boolean), `[깡자동 사주] ${today} 가족 일일운세`, html);
+    console.log("사주 메일 발송 성공");
+  } catch (e) {
+    console.error("사주 메일 발송 실패:", String(e).slice(0, 200));
+  }
 }
 
 async function refreshKakaoToken(refreshToken: string): Promise<string | null> {

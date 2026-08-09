@@ -1,11 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendMail } from "../_shared/mail.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const NAVER_CLIENT_ID = Deno.env.get("NAVER_CLIENT_ID") || "";
 const NAVER_CLIENT_SECRET = Deno.env.get("NAVER_CLIENT_SECRET") || "";
-const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY")!;
 const KAKAO_REST_API_KEY = Deno.env.get("KAKAO_REST_API_KEY");
 const KAKAO_CLIENT_SECRET = Deno.env.get("KAKAO_CLIENT_SECRET");
 
@@ -963,22 +963,12 @@ function buildHtml(briefingText: string, today: string): string {
 async function sendEmail(briefingText: string, emails: string[]) {
   const today = new Date().toLocaleDateString("ko-KR");
   const html = buildHtml(briefingText, today);
-  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SENDGRID_API_KEY}`,
-    },
-    body: JSON.stringify({
-      personalizations: [
-        { to: emails.filter(Boolean).map((email) => ({ email })) },
-      ],
-      from: { email: "20oioi20@gmail.com", name: "깡자동 AI비서" },
-      subject: `[깡자동] ${today} 아침 브리핑`,
-      content: [{ type: "text/html", value: html }],
-    }),
-  });
-  console.log("SendGrid 상태:", res.status);
+  try {
+    await sendMail(emails.filter(Boolean), `[깡자동] ${today} 아침 브리핑`, html);
+    console.log("Gmail 발송 성공");
+  } catch (e) {
+    console.error("Gmail 발송 실패:", String(e).slice(0, 200));
+  }
 }
 
 async function refreshKakaoToken(refreshToken: string): Promise<string | null> {

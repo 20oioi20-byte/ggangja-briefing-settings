@@ -1,8 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendMail } from "../_shared/mail.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY")!;
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
 
 // 마지막으로 성공한 분석 경로 (히스토리 _provider)
@@ -419,17 +419,12 @@ function buildYoutubeHtml(video: any, summary: string, ok: boolean, failReason?:
 
 async function sendEmail(video: any, summary: string, ok: boolean, emails: string[], failReason?: string) {
   const html = buildYoutubeHtml(video, summary, ok, failReason);
-  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SENDGRID_API_KEY}` },
-    body: JSON.stringify({
-      personalizations: [{ to: emails.filter(Boolean).map(email => ({ email })) }],
-      from: { email: "20oioi20@gmail.com", name: "깡자동 AI비서" },
-      subject: `[깡자동 유튜브] ${video.channelTitle} - ${video.title}`,
-      content: [{ type: "text/html", value: html }],
-    }),
-  });
-  console.log(`메일 발송 (${video.title}):`, res.status);
+  try {
+    await sendMail(emails.filter(Boolean), `[깡자동 유튜브] ${video.channelTitle} - ${video.title}`, html);
+    console.log(`메일 발송 성공 (${video.title})`);
+  } catch (e) {
+    console.error(`메일 발송 실패 (${video.title}):`, String(e).slice(0, 200));
+  }
 }
 
 async function refreshKakaoToken(refreshToken: string): Promise<string | null> {
