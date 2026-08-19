@@ -135,6 +135,17 @@ const DAY_NUMS=[1,2,3,4,5,6,7];
 const TYPES={news:'뉴스',stock:'주식',trend:'트렌드',custom:'직접'};
 const COUNTS=[3,5,10,15,20];
 
+// Supabase Storage 객체 키는 한글/공백/괄호 등을 거부합니다 (Invalid key 오류).
+// 카톡으로 공유된 이미지 파일명("카카오톡 이미지_2026-08-19 (1).jpg" 등)이 대부분 이 경우라
+// 업로드 전 안전한 키로 변환합니다. 실제 파일명은 카톡 메시지에 표시할 때 그대로 씁니다.
+function safeFileKey(name){
+  const dot=name.lastIndexOf('.');
+  const base=dot>0?name.slice(0,dot):name;
+  const ext=(dot>0?name.slice(dot):'').replace(/[^a-zA-Z0-9.]/g,'');
+  const safeBase=base.replace(/[^\x00-\x7f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,50);
+  return `${Date.now()}_${safeBase||'file'}${ext}`;
+}
+
 /* ── 값 정규화 헬퍼 ── */
 function toArray(v){
   if(v==null)return[];
@@ -323,7 +334,7 @@ function mkDB(key,sessionToken){
     },
     async kakaoSendFile(file){
       // Storage 업로드(서버 경유) 후 링크 발송
-      const fname=`${Date.now()}_${file.name}`;
+      const fname=safeFileKey(file.name);
       const buf=await file.arrayBuffer();
       const base64=btoa(new Uint8Array(buf).reduce((s,b)=>s+String.fromCharCode(b),''));
       const {publicUrl}=await api('storage','upload',{fname,contentType:file.type||'application/octet-stream',base64});
