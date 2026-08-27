@@ -114,32 +114,33 @@ function getKST() {
   };
 }
 
-// ── 사주 천간지지 계산 ──
-const STEMS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
-const BRANCHES = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
-
-function getDayGanzhi(year: number, month: number, date: number): string {
-  // 기준: 2024-01-01 = 癸未日 (index 19)
-  const ref = new Date(Date.UTC(2024, 0, 1));
-  const target = new Date(Date.UTC(year, month - 1, date));
-  const diff = Math.round((target.getTime() - ref.getTime()) / 86400000);
-  const idx = ((19 + diff) % 60 + 60) % 60;
-  return STEMS[idx % 10] + BRANCHES[idx % 12] + '日';
+// ── 사주 천간지지 계산 (lunar-javascript의 EightChar 사용) ──
+// 예전엔 직접 만든 60갑자 계산식을 썼는데, 기준일 자체가 틀려있었고(2024-01-01을 癸未일로 잘못
+// 잡음 - 실제로는 甲子일) 월주/년주 계산도 절기(입춘 등) 경계를 반영하지 않는 근사식이었습니다.
+// lunar-javascript의 EightChar(八字, 사주팔자 전용 API)로 교체해 절기 기준까지 정확하게 계산합니다.
+function getEightChar(year: number, month: number, date: number, hour = 12, minute = 0) {
+  const solar = Lunar.Solar.fromYmdHms(year, month, date, hour, minute, 0);
+  return solar.getLunar().getEightChar();
 }
 
-function getYearGanzhi(year: number): string {
-  const si = ((year - 4) % 10 + 10) % 10;
-  const bi = ((year - 4) % 12 + 12) % 12;
-  return STEMS[si] + BRANCHES[bi] + '年';
+function getTodayGanzhi(kst: any): { year: string; month: string; day: string } {
+  const ec = getEightChar(kst.year, kst.month, kst.date, kst.hour);
+  return { year: ec.getYear(), month: ec.getMonth(), day: ec.getDay() };
 }
 
-function getMonthGanzhi(year: number, month: number): string {
-  const branchIdx = (month + 1) % 12;
-  const yearStem = ((year - 4) % 10 + 10) % 10;
-  const monthStemStart = [2, 4, 6, 8, 0][yearStem % 5];
-  const monthsFromYin = ((branchIdx - 2 + 12) % 12);
-  const stemIdx = (monthStemStart + monthsFromYin) % 10;
-  return STEMS[stemIdx] + BRANCHES[branchIdx] + '月';
+// ── 구성원 본인의 사주(년주/월주/일주) - AI가 아닌 코드로 직접 계산해 정확성 보장 ──
+function getMemberNatalGanzhi(m: any): string {
+  if (!m.birth_solar_date) return '';
+  const parts = m.birth_solar_date.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n: number) => isNaN(n))) return '';
+  const [y, mo, d] = parts;
+  let hour = 12, minute = 0;
+  if (m.birth_solar_time) {
+    const t = String(m.birth_solar_time).split(':').map(Number);
+    if (t.length >= 2 && !isNaN(t[0]) && !isNaN(t[1])) { hour = t[0]; minute = t[1]; }
+  }
+  const ec = getEightChar(y, mo, d, hour, minute);
+  return `${ec.getYear()} ${ec.getMonth()} ${ec.getDay()}`;
 }
 
 async function getSettings() {
@@ -196,6 +197,9 @@ function buildMemberInfo(m: any): string {
   if (m.current_location) fields.push(`현재 사는 곳: ${m.current_location}`);
   if (m.occupation) fields.push(`현재 하는 일: ${m.occupation}`);
   if (m.notes) fields.push(`기타: ${m.notes}`);
+  // 사주(년주/월주/일주)는 AI가 생년월일로부터 다시 계산하게 두지 않고, 코드로 직접 계산해 사실로 못박아 전달
+  const natal = getMemberNatalGanzhi(m);
+  if (natal) fields.push(`사주(년주/월주/일주, 이미 계산됨 - 다시 계산하지 말고 그대로 사용): ${natal}`);
   return fields.join('\n');
 }
 
@@ -209,10 +213,8 @@ async function analyzeSaju(members: any[], kst: any): Promise<any[]> {
   const dateLabel = buildDateLabel(kst);
 
   // 오늘 일진 계산
-  const yearGanzhi = getYearGanzhi(kst.year);
-  const monthGanzhi = getMonthGanzhi(kst.year, kst.month);
-  const dayGanzhi = getDayGanzhi(kst.year, kst.month, kst.date);
-  const todayGanzhi = `${yearGanzhi} ${monthGanzhi} ${dayGanzhi}`;
+  const today = getTodayGanzhi(kst);
+  const todayGanzhi = `${today.year} ${today.month} ${today.day}`;
 
   const memberInfos = members.map(m => `【${m.name}】\n${buildMemberInfo(m)}`).join('\n\n');
 
@@ -220,7 +222,7 @@ async function analyzeSaju(members: any[], kst: any): Promise<any[]> {
 
 오늘: ${dateLabel} (오늘 일진: ${todayGanzhi})
 
-위 일진을 정확히 반영하여 아래 가족 구성원 각자의 사주와 오늘 일진의 상호작용을 분석하고, 오늘 하루 운세를 알려주세요.
+아래 각 구성원 정보에는 이미 코드로 정확히 계산된 본인의 사주(년주/월주/일주)가 포함되어 있습니다. 절대 임의로 다시 계산하거나 다른 사주를 가정하지 말고, 주어진 그 사주(특히 일주의 천간 = 일간)를 오늘 일진과 비교(생극제화)하여 실제로 근거 있게 분석한 뒤, 오늘 하루 운세를 알려주세요.
 
 ${memberInfos}
 

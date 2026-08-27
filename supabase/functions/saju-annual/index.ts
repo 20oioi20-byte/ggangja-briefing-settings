@@ -142,6 +142,22 @@ function solarToLunarA(dateStr: string): string {
   } catch { return ''; }
 }
 
+// ── 구성원 본인의 사주(년주/월주/일주) - AI가 아닌 코드로 직접 계산해 정확성 보장 ──
+// (saju-briefing과 동일한 방식: lunar-javascript의 EightChar는 절기 기준까지 정확히 반영)
+function getMemberNatalGanzhiA(m: any): string {
+  if (!m.birth_solar_date) return '';
+  const parts = m.birth_solar_date.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n: number) => isNaN(n))) return '';
+  const [y, mo, d] = parts;
+  let hour = 12, minute = 0;
+  if (m.birth_solar_time) {
+    const t = String(m.birth_solar_time).split(':').map(Number);
+    if (t.length >= 2 && !isNaN(t[0]) && !isNaN(t[1])) { hour = t[0]; minute = t[1]; }
+  }
+  const ec = Lunar.Solar.fromYmdHms(y, mo, d, hour, minute, 0).getLunar().getEightChar();
+  return `${ec.getYear()} ${ec.getMonth()} ${ec.getDay()}`;
+}
+
 function buildMemberInfo(m: any): string {
   const fields: string[] = [];
   if (m.name) fields.push(`이름: ${m.name}${m.name_hanja ? ` (${m.name_hanja})` : ''}`);
@@ -157,6 +173,8 @@ function buildMemberInfo(m: any): string {
   if (m.current_location) fields.push(`현재 사는 곳: ${m.current_location}`);
   if (m.occupation) fields.push(`현재 하는 일: ${m.occupation}`);
   if (m.notes) fields.push(`기타: ${m.notes}`);
+  const natal = getMemberNatalGanzhiA(m);
+  if (natal) fields.push(`사주(년주/월주/일주, 이미 계산됨 - 다시 계산하지 말고 그대로 사용): ${natal}`);
   return fields.join('\n');
 }
 
@@ -167,6 +185,7 @@ async function analyzeAnnual(member: any, year: number): Promise<string> {
   const prompt = `당신은 한국 전통 토정비결과 사주명리학에 정통한 전문가입니다.
 
 ${year}년(${yearGanzhi}) ${member.name}님의 연간운세를 전문적으로 분석해주세요.
+아래 구성원 정보에 이미 코드로 정확히 계산된 본인의 사주(년주/월주/일주)가 포함되어 있습니다. 절대 임의로 다시 계산하거나 다른 사주를 가정하지 말고, 주어진 그 사주를 그대로 근거로 사용하세요.
 
 【구성원 정보】
 ${info}
