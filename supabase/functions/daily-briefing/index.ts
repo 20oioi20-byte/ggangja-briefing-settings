@@ -26,8 +26,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 /** 관심사당 브리핑에 실을 최대 기사 수 (수집 후보 extra와 별개) */
 const BRIEFING_MAX_PER_INTEREST = 3;
-/** 최신 기사 허용 창 (시간). 24h는 아침 발송 시 0건이 잦아 48h로 완화 */
-const NEWS_MAX_AGE_HOURS = 48;
+/** 최신 기사 허용 창 (시간). 주 1회(월요일) 발송으로 바뀌면서 지난 한 주(7일) 전체를 담도록 확대 */
+const NEWS_MAX_AGE_HOURS = 24 * 7;
 
 /** 마지막 사용된 AI / 뉴스 API (히스토리 _provider 기록용) */
 let lastAIProvider = "Claude API";

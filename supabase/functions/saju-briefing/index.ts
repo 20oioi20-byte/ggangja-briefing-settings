@@ -199,56 +199,57 @@ function buildMemberInfo(m: any): string {
   return fields.join('\n');
 }
 
-// ── Claude로 일일 사주 분석 (JSON 구조로 받음) ──
-async function analyzeSaju(members: any[], kst: any): Promise<any[]> {
-  const today = `${kst.year}년 ${kst.month}월 ${kst.date}일`;
-  const weekdays = ['', '월', '화', '수', '목', '금', '토', '일'];
-  const weekday = weekdays[kst.day] || '';
+// ── 이번 주(월~일) 날짜 라벨, 예: "8월 10일~16일" ──
+function buildWeekLabel(kst: any): string {
+  const monday = new Date(Date.UTC(kst.year, kst.month - 1, kst.date));
+  const sunday = new Date(monday.getTime() + 6 * 86400000);
+  const sameMonth = monday.getUTCMonth() === sunday.getUTCMonth();
+  const startStr = `${monday.getUTCMonth() + 1}월 ${monday.getUTCDate()}일`;
+  const endStr = sameMonth ? `${sunday.getUTCDate()}일` : `${sunday.getUTCMonth() + 1}월 ${sunday.getUTCDate()}일`;
+  return `${startStr}~${endStr}`;
+}
 
-  // 오늘 일진 계산
+// ── Claude로 주간 사주 분석 (JSON 구조로 받음, 별점+한줄요약 위주) ──
+async function analyzeSaju(members: any[], kst: any): Promise<any[]> {
+  const weekLabel = buildWeekLabel(kst);
+
+  // 이번 주 시작(월요일) 기준 일진 계산 - 한 주 흐름의 기준점으로 사용
   const yearGanzhi = getYearGanzhi(kst.year);
   const monthGanzhi = getMonthGanzhi(kst.year, kst.month);
   const dayGanzhi = getDayGanzhi(kst.year, kst.month, kst.date);
-  const todayGanzhi = `${yearGanzhi} ${monthGanzhi} ${dayGanzhi}`;
+  const weekGanzhi = `${yearGanzhi} ${monthGanzhi} ${dayGanzhi}`;
 
   const memberInfos = members.map(m => `【${m.name}】\n${buildMemberInfo(m)}`).join('\n\n');
 
-  const prompt = `당신은 한국 전통 사주명리학과 오행론에 정통한 전문가입니다.
+  const prompt = `당신은 한국 전통 사주명리학에 정통하면서도, 딱딱한 설명 없이 재치있고 술술 읽히게 운세를 전달하는 데 능한 전문가입니다.
 
-오늘 날짜: ${today}(${weekday}요일)
-오늘 일진: ${todayGanzhi}
+이번 주: ${weekLabel} (월요일 기준 일진: ${weekGanzhi})
 
-위 일진을 정확히 반영하여 아래 가족 구성원 각자의 사주와 오늘 일진의 상호작용을 분석하고, 실생활에 도움이 되는 운세를 알려주세요.
+아래 가족 구성원 각자의 사주를 바탕으로 이번 한 주의 운세를 분석해주세요.
 
 ${memberInfos}
 
-분석 기준:
-- 각 구성원의 일간과 오늘 일간의 관계(생극제화) 분석
-- 오늘 지지가 각 구성원 사주에 미치는 영향
-- 직업/재물/건강/관계 중 오늘 특히 두드러지는 영역 강조
-- 구체적이고 실용적인 조언 (추상적 표현 지양)
-
-응답 언어 규칙 (매우 중요):
-- 한자 단어는 반드시 한글 뜻으로 풀어서 작성하세요.
-  예시: 壬水(임수) → '물의 기운', 甲辰(갑진) → '나무-용의 기운', 食傷(식상) → '표현과 활동의 기운',
-        生克(생극) → '기운의 흐름', 財星(재성) → '재물의 기운', 官星(관성) → '명예와 직장의 기운'
-- 전문 용어 사용 시 반드시 괄호로 한글 설명 추가: 예) 비겁(나와 비슷한 기운)
-- 일반인이 바로 이해할 수 있는 쉬운 표현 사용
-- 한자만 단독으로 나오면 안 됨 (항상 한글 뜻 병기)
+작성 지침 (매우 중요):
+- 왜 그런지 명리학적 근거(오행 상생상극 등)를 설명하는 문장은 절대 쓰지 마세요. 결과만, 그것도 짧고 재미있게.
+- 각 항목의 line은 한 문장, 20자 내외로 짧고 임팩트 있게. 이모지 1개 정도는 활용 가능.
+- 성인(본인/배우자 등)은 애정운·건강운·가족운·재물운·직장운·관계운 6개 항목을 쓰세요.
+- 미성년 자녀(초/중/고등학생 등)는 애정운·직장운 대신 교우관계운·학업운으로 바꿔서 6개 항목을 쓰세요 (가족운·건강운·재물운·관계운은 동일하게 사용).
+- stars는 1~5 사이 정수(그 항목이 얼마나 좋은 한 주인지).
+- headline은 그 사람의 이번 주 전체를 한 문장으로 위트있게 요약 (예: '밀어붙이면 통하는 주', '한 발 물러서면 편한 주').
+- lucky는 한 줄(색상/방향/숫자/음식).
 
 응답은 반드시 아래 JSON 형식만 출력하세요. 설명, 마크다운, 코드블록(#, **, |, --- 등) 없이 { 로 시작해서 } 로 끝나야 합니다.
 중요 규칙:
 1. 모든 문자열 값 안에서는 큰따옴표(")를 절대 쓰지 마세요. 작은따옴표(')를 쓰세요.
 2. 기본정보(생년월일 등 원본 데이터)는 응답에 포함하지 마세요. 해석 결과만 담으세요.
-3. fortune은 3~4문장(일진과의 관계를 쉬운 말로), caution은 1~2문장(구체적), lucky는 한 줄(색상/방향/숫자/음식).
 
-{"members":[{"name":"이름","fortune":"오늘 전반적인 기운과 흐름 (쉬운 한글로)","caution":"오늘 조심해야 할 것 (구체적으로)","lucky":"행운의 색상/방향/숫자/음식 한 줄"}]}`;
+{"members":[{"name":"이름","headline":"이번 주 한 줄 요약","categories":[{"label":"애정운","stars":4,"line":"한 줄 요점"},{"label":"건강운","stars":3,"line":"..."},{"label":"가족운","stars":5,"line":"..."},{"label":"재물운","stars":2,"line":"..."},{"label":"직장운","stars":4,"line":"..."},{"label":"관계운","stars":3,"line":"..."}],"lucky":"행운의 색상/방향/숫자/음식 한 줄"}]}`;
 
-  const text = await callAI(prompt, 3000, 'saju');
+  const text = await callAI(prompt, 4000, 'saju');
   return parseSajuJson(text, members);
 }
 
-// ── JSON 파싱 (다단계 복구, daily-briefing과 동일 패턴) ──
+// ── JSON 파싱 (다단계 복구) ──
 function parseSajuJson(text: string, members: any[]): any[] {
   let clean = text.replace(/```json|```/g, "").trim();
   const start = clean.indexOf('{');
@@ -259,46 +260,47 @@ function parseSajuJson(text: string, members: any[]): any[] {
     const parsed = JSON.parse(clean);
     if (Array.isArray(parsed.members) && parsed.members.length > 0) return parsed.members;
   } catch (e) {
-    console.error("사주 JSON 1차 파싱 실패:", e);
+    console.error("사주 JSON 파싱 실패:", e);
   }
 
-  // 2차: 정규식 블록 추출
-  try {
-    const result: any[] = [];
-    const blockRegex = /"name":"([^"]*)"\s*,\s*"fortune":"((?:[^"\\]|\\.)*)"\s*,\s*"caution":"((?:[^"\\]|\\.)*)"\s*,\s*"lucky":"((?:[^"\\]|\\.)*)"/g;
-    let m;
-    while ((m = blockRegex.exec(clean)) !== null) {
-      result.push({ name: m[1], fortune: m[2], caution: m[3], lucky: m[4] });
-    }
-    if (result.length > 0) return result;
-  } catch (e) {
-    console.error("사주 JSON 2차 복구 실패:", e);
-  }
-
-  // 3차: 전부 실패 시 원본 구성원 이름만으로 안내 메시지
+  // 실패 시 원본 구성원 이름만으로 안내 메시지
   return members.map(m => ({
     name: m.name,
-    fortune: "오늘 운세 분석을 가져오지 못했습니다.",
-    caution: "",
+    headline: "이번 주 운세 분석을 가져오지 못했습니다.",
+    categories: [],
     lucky: "",
   }));
 }
 
-// ── 메일 HTML (통합 1통, 기본정보 없음, 마크다운 없는 깔끔한 카드) ──
-function buildSajuHtml(membersResult: any[], today: string): string {
-  const cards = membersResult.map(m => `
+function starIcons(n: any): string {
+  const num = Math.max(0, Math.min(5, Math.round(Number(n) || 0)));
+  return '★'.repeat(num) + '☆'.repeat(5 - num);
+}
+
+// ── 메일 HTML (통합 1통, 별점 카드형) ──
+function buildSajuHtml(membersResult: any[], weekLabel: string): string {
+  const cards = membersResult.map(m => {
+    const rows = (m.categories || []).map((c: any) => `
+      <tr>
+        <td style="padding:6px 10px 6px 0;font-size:13px;color:#333;white-space:nowrap">${c.label || ''}</td>
+        <td style="padding:6px 10px;font-size:13px;color:#f5a623;white-space:nowrap;letter-spacing:1px">${starIcons(c.stars)}</td>
+        <td style="padding:6px 0;font-size:13px;color:#555">${c.line || ''}</td>
+      </tr>`).join('');
+
+    return `
     <div style="margin-bottom:22px;padding:16px;background:#faf8ff;border-radius:8px;border-left:4px solid #7b2ff7">
-      <h3 style="margin:0 0 10px;font-size:16px;color:#4a0080">🔮 ${m.name}</h3>
-      <p style="margin:0 0 8px;font-size:13px;color:#333;line-height:1.8"><strong>오늘의 운세</strong><br>${(m.fortune||'').replace(/\n/g,'<br>')}</p>
-      ${m.caution?`<p style="margin:0 0 8px;font-size:13px;color:#333;line-height:1.8"><strong>주의할 점</strong><br>${m.caution.replace(/\n/g,'<br>')}</p>`:''}
-      ${m.lucky?`<p style="margin:0;font-size:13px;color:#7b2ff7;line-height:1.8"><strong>행운의 요소</strong><br>${m.lucky.replace(/\n/g,'<br>')}</p>`:''}
-    </div>`).join('');
+      <h3 style="margin:0 0 6px;font-size:16px;color:#4a0080">🔮 ${m.name}</h3>
+      ${m.headline ? `<p style="margin:0 0 12px;font-size:13px;color:#7b2ff7;font-weight:600">"${m.headline}"</p>` : ''}
+      <table style="width:100%;border-collapse:collapse">${rows}</table>
+      ${m.lucky ? `<p style="margin:12px 0 0;font-size:12px;color:#888">🍀 ${m.lucky}</p>` : ''}
+    </div>`;
+  }).join('');
 
   return `
 <div style="font-family:'Apple SD Gothic Neo',Arial,sans-serif;max-width:680px;margin:0 auto;color:#222;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">
   <div style="background:linear-gradient(135deg,#4a0080,#7b2ff7);padding:20px 24px">
-    <h2 style="color:#fff;margin:0;font-size:18px;font-weight:700">🔮 사주 브리핑</h2>
-    <p style="color:rgba(255,255,255,.85);margin:4px 0 0;font-size:13px">${today}</p>
+    <h2 style="color:#fff;margin:0;font-size:18px;font-weight:700">🔮 주간 사주 브리핑</h2>
+    <p style="color:rgba(255,255,255,.85);margin:4px 0 0;font-size:13px">${weekLabel}</p>
   </div>
   <div style="background:#fff;padding:20px 24px">
     ${cards}
@@ -309,10 +311,10 @@ function buildSajuHtml(membersResult: any[], today: string): string {
 </div>`;
 }
 
-async function sendEmail(membersResult: any[], today: string, emails: string[]) {
-  const html = buildSajuHtml(membersResult, today);
+async function sendEmail(membersResult: any[], weekLabel: string, emails: string[]) {
+  const html = buildSajuHtml(membersResult, weekLabel);
   try {
-    await sendMail(emails.filter(Boolean), `[깡자동 사주] ${today} 가족 일일운세`, html);
+    await sendMail(emails.filter(Boolean), `[깡자동 사주] ${weekLabel} 주간운세`, html);
     console.log("사주 메일 발송 성공");
   } catch (e) {
     console.error("사주 메일 발송 실패:", String(e).slice(0, 200));
@@ -339,11 +341,13 @@ async function refreshKakaoToken(refreshToken: string): Promise<string | null> {
 }
 
 // ── 카카오: 구성원별 개별 발송 (유튜브 브리핑과 동일 패턴, 1000자 한계 회피) ──
-async function sendKakaoPerMember(m: any, today: string, accessToken: string | null) {
+async function sendKakaoPerMember(m: any, weekLabel: string, accessToken: string | null) {
   if (!accessToken) return;
-  let text = `🔮 ${m.name} 오늘의 사주\n${today}\n\n${m.fortune || ''}`;
-  if (m.caution) text += `\n\n⚠ 주의할 점\n${m.caution}`;
-  if (m.lucky) text += `\n\n🍀 행운의 요소\n${m.lucky}`;
+  let text = `🔮 ${m.name}님의 이번 주 사주\n${weekLabel}`;
+  if (m.headline) text += `\n"${m.headline}"`;
+  const catLines = (m.categories || []).map((c: any) => `${c.label} ${starIcons(c.stars)}\n${c.line || ''}`).join('\n\n');
+  if (catLines) text += `\n\n${catLines}`;
+  if (m.lucky) text += `\n\n🍀 ${m.lucky}`;
 
   const body = new URLSearchParams();
   body.append('template_object', JSON.stringify({
@@ -384,7 +388,7 @@ async function runBriefing(force: boolean) {
   const members = await getMembers();
   if (members.length === 0) return { skipped: true, reason: "등록된 구성원 없음" };
 
-  const today = `${kst.year}년 ${kst.month}월 ${kst.date}일`;
+  const weekLabel = buildWeekLabel(kst);
   const membersResult = await analyzeSaju(members, kst);
 
   const [emails, kakaoToken] = await Promise.all([
@@ -394,20 +398,22 @@ async function runBriefing(force: boolean) {
 
   // 메일: 통합 1통 / 카톡: 구성원별 개별 발송
   await Promise.all([
-    sendEmail(membersResult, today, emails),
-    ...membersResult.map(m => sendKakaoPerMember(m, today, kakaoToken)),
+    sendEmail(membersResult, weekLabel, emails),
+    ...membersResult.map(m => sendKakaoPerMember(m, weekLabel, kakaoToken)),
   ]);
 
-  // 히스토리 저장
+  // 히스토리 저장 (date 컬럼은 실제 date 타입이라 ISO 형식 사용, 주간 라벨은 content에만 기록)
+  const isoDate = `${kst.year}-${String(kst.month).padStart(2, '0')}-${String(kst.date).padStart(2, '0')}`;
   const sajuProvider = lastAIProvider;
-  await supabase.from("briefings").insert({
-    date: today,
-    content: JSON.stringify({ _type: "saju", _provider: sajuProvider, members: membersResult }),
+  const { error: historyError } = await supabase.from("briefings").insert({
+    date: isoDate,
+    content: JSON.stringify({ _type: "saju", _provider: sajuProvider, week: weekLabel, members: membersResult }),
     sent_at: new Date().toISOString(),
     channel: "saju",
   });
+  if (historyError) console.error("사주 히스토리 저장 실패:", JSON.stringify(historyError));
 
-  return { success: true, memberCount: members.length, today };
+  return { success: true, memberCount: members.length, week: weekLabel };
 }
 
 Deno.serve(async (_req) => {
